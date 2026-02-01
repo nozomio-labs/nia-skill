@@ -71,13 +71,21 @@ All scripts are in `./scripts/`. Base URL: `https://apigcp.trynia.ai/v2`
 
 ### Data Sources (Docs, Papers, Datasets)
 
+All data source types (documentation, research papers, HuggingFace datasets) share the same tree/ls/read/grep operations.
+
 ```bash
 ./scripts/sources-list.sh [type]                     # List sources (documentation|research_paper|huggingface_dataset)
 ./scripts/sources-index.sh "https://docs.example.com" # Index docs
 ./scripts/sources-tree.sh "source_id_or_name"        # Get source tree
+./scripts/sources-ls.sh "source_id" "/path"          # List directory contents
 ./scripts/sources-read.sh "source_id" "/path"        # Read from source
 ./scripts/sources-grep.sh "source_id" "pattern"      # Grep content
 ```
+
+**Flexible identifiers**: Most data source endpoints accept UUID, display name, or URL:
+- UUID: `550e8400-e29b-41d4-a716-446655440000`
+- Display name: `Vercel AI SDK - Core`, `openai/gsm8k`
+- URL: `https://docs.trynia.ai/`, `https://arxiv.org/abs/2312.00752`
 
 ### Research Papers (arXiv)
 
@@ -86,6 +94,13 @@ All scripts are in `./scripts/`. Base URL: `https://apigcp.trynia.ai/v2`
 ./scripts/papers-index.sh "2312.00752"               # Index paper (ID, URL, or PDF URL)
 ```
 
+Supports multiple formats:
+- Full URL: `https://arxiv.org/abs/2312.00752`
+- PDF URL: `https://arxiv.org/pdf/2312.00752.pdf`
+- Raw ID: `2312.00752`
+- Old format: `hep-th/9901001`
+- With version: `2312.00752v1`
+
 ### HuggingFace Datasets
 
 ```bash
@@ -93,22 +108,40 @@ All scripts are in `./scripts/`. Base URL: `https://apigcp.trynia.ai/v2`
 ./scripts/datasets-index.sh "squad"                  # Index dataset (name, owner/dataset, or URL)
 ```
 
+Supports: `squad`, `dair-ai/emotion`, `https://huggingface.co/datasets/squad`
+
 ### Search
 
 ```bash
-./scripts/search-universal.sh "query"                # Search ALL indexed sources
+./scripts/search-query.sh "query" "repos" [docs]     # Query specific repos/sources with chat context
+./scripts/search-universal.sh "query"                # Search ALL indexed sources (hybrid vector+BM25)
 ./scripts/search-web.sh "query" [num_results]        # Web search
 ./scripts/search-deep.sh "query"                     # Deep research (Pro)
 ```
 
+**search-query.sh** - Main query endpoint for targeted searches:
+- Pass specific repositories and/or data sources to search
+- Supports chat context (messages array)
+- Returns AI-generated response with sources
+
+**search-universal.sh** - Searches all your indexed sources at once:
+- Hybrid vector + BM25 search
+- Cross-repo/cross-doc discovery
+- Good for "where is X defined across all my sources?"
+
 ### Package Search
+
+Search source code of public packages across npm, PyPI, crates.io, and Go modules.
 
 ```bash
 ./scripts/package-grep.sh "npm" "react" "pattern"    # Grep package (npm|py_pi|crates_io|golang_proxy)
 ./scripts/package-hybrid.sh "npm" "react" "query"    # Semantic search in packages
+./scripts/package-read.sh "npm" "react" "sha256" 1 100 # Read lines from package file
 ```
 
 ### Global Sources
+
+Subscribe to publicly indexed sources for instant access without re-indexing.
 
 ```bash
 ./scripts/global-subscribe.sh "https://github.com/vercel/ai-sdk"  # Subscribe to public source
@@ -116,9 +149,25 @@ All scripts are in `./scripts/`. Base URL: `https://apigcp.trynia.ai/v2`
 
 ### Oracle Research (Pro)
 
+Autonomous AI research agent with extended thinking and tool use.
+
+**Jobs API (recommended):**
 ```bash
-./scripts/oracle.sh "research query"                 # Run autonomous research
+./scripts/oracle-job.sh "research query"             # Create research job
+./scripts/oracle-job-status.sh "job_id"              # Get job status/result
+./scripts/oracle-jobs-list.sh [status] [limit]       # List jobs
+```
+
+**Direct API:**
+```bash
+./scripts/oracle.sh "research query"                 # Run research (blocking)
 ./scripts/oracle-sessions.sh                         # List research sessions
+```
+
+### Usage
+
+```bash
+./scripts/usage.sh                                   # Get API usage summary
 ```
 
 ## API Reference
@@ -127,9 +176,35 @@ All scripts are in `./scripts/`. Base URL: `https://apigcp.trynia.ai/v2`
 - **Auth**: Bearer token in Authorization header
 - **Flexible identifiers**: Most endpoints accept UUID, display name, or URL
 
-| Type | Endpoint | Identifier Examples |
-|------|----------|---------------------|
+### Source Types
+
+| Type | Index Endpoint | Identifier Examples |
+|------|----------------|---------------------|
 | Repository | POST /repositories | `owner/repo`, `microsoft/vscode` |
 | Documentation | POST /data-sources | `https://docs.example.com` |
 | Research Paper | POST /research-papers | `2312.00752`, arXiv URL |
 | HuggingFace Dataset | POST /huggingface-datasets | `squad`, `owner/dataset` |
+
+### Search Modes
+
+For `/search/query`:
+- `repositories` - Search GitHub repositories only (default)
+- `sources` - Search data sources only (docs, papers, datasets)
+
+Pass sources via:
+- `repositories` array: `[{"repository": "owner/repo"}]`
+- `data_sources` array: `["display-name", "uuid", "https://url"]`
+
+### Endpoints Summary
+
+| Category | Endpoints |
+|----------|-----------|
+| Repositories | GET/POST /repositories, GET/DELETE /repositories/{id}, /repositories/{id}/tree, /content, /grep |
+| Data Sources | GET/POST /data-sources, GET/DELETE /data-sources/{id}, /tree, /ls, /read, /grep |
+| Research Papers | GET/POST /research-papers |
+| HuggingFace Datasets | GET/POST /huggingface-datasets |
+| Search | POST /search/query, /search/universal, /search/web, /search/deep |
+| Package Search | POST /package-search/grep, /hybrid, /read-file |
+| Global Sources | POST /global-sources/subscribe |
+| Oracle | POST /oracle, /oracle/jobs, GET /oracle/jobs/{id}, /oracle/sessions |
+| Usage | GET /usage |
