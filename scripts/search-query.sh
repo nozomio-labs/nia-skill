@@ -23,13 +23,13 @@ else
   DOCS_JSON="[]"
 fi
 
-# Determine search_mode
+# Determine search_mode (API values: repositories, sources, unified)
 if [ -n "$REPOS" ] && [ -z "$DOCS" ]; then
   MODE="repositories"
 elif [ -z "$REPOS" ] && [ -n "$DOCS" ]; then
-  MODE="data_sources"
+  MODE="sources"
 else
-  MODE="all"
+  MODE="unified"
 fi
 
 DATA=$(jq -n \
