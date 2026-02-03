@@ -7,9 +7,10 @@ if [ -z "$1" ]; then echo "Usage: search-deep.sh 'research query'"; exit 1; fi
 
 QUERY="$1"
 
-DATA=$(jq -n --arg q "$QUERY" '{query: $q}')
+# New unified /search endpoint with mode: "deep"
+DATA=$(jq -n --arg q "$QUERY" '{mode: "deep", query: $q}')
 
-curl -s -X POST "https://apigcp.trynia.ai/v2/search/deep" \
+curl -s -X POST "https://apigcp.trynia.ai/v2/search" \
   -H "Authorization: Bearer $NIA_KEY" \
   -H "Content-Type: application/json" \
   -d "$DATA" | jq '.'

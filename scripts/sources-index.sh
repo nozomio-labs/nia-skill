@@ -8,9 +8,10 @@ if [ -z "$1" ]; then echo "Usage: sources-index.sh 'https://docs.example.com' [l
 URL="$1"
 LIMIT="${2:-1000}"
 
-DATA=$(jq -n --arg u "$URL" --argjson l "$LIMIT" '{url: $u, limit: $l, only_main_content: true}')
+# New unified /sources endpoint with type discriminator
+DATA=$(jq -n --arg u "$URL" --argjson l "$LIMIT" '{type: "documentation", url: $u, limit: $l, only_main_content: true}')
 
-curl -s -X POST "https://apigcp.trynia.ai/v2/data-sources" \
+curl -s -X POST "https://apigcp.trynia.ai/v2/sources" \
   -H "Authorization: Bearer $NIA_KEY" \
   -H "Content-Type: application/json" \
   -d "$DATA" | jq '.'

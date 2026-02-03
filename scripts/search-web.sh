@@ -8,9 +8,10 @@ if [ -z "$1" ]; then echo "Usage: search-web.sh 'query' [num_results]"; exit 1; 
 QUERY="$1"
 NUM="${2:-5}"
 
-DATA=$(jq -n --arg q "$QUERY" --argjson n "$NUM" '{query: $q, num_results: $n}')
+# New unified /search endpoint with mode: "web"
+DATA=$(jq -n --arg q "$QUERY" --argjson n "$NUM" '{mode: "web", query: $q, num_results: $n}')
 
-curl -s -X POST "https://apigcp.trynia.ai/v2/search/web" \
+curl -s -X POST "https://apigcp.trynia.ai/v2/search" \
   -H "Authorization: Bearer $NIA_KEY" \
   -H "Content-Type: application/json" \
   -d "$DATA" | jq '.'

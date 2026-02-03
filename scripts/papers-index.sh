@@ -8,9 +8,10 @@ if [ -z "$1" ]; then echo "Usage: papers-index.sh arxiv_id_or_url"; exit 1; fi
 
 PAPER="$1"
 
-DATA=$(jq -n --arg u "$PAPER" '{url: $u}')
+# New unified /sources endpoint with type discriminator
+DATA=$(jq -n --arg u "$PAPER" '{type: "research_paper", url: $u}')
 
-curl -s -X POST "https://apigcp.trynia.ai/v2/research-papers" \
+curl -s -X POST "https://apigcp.trynia.ai/v2/sources" \
   -H "Authorization: Bearer $NIA_KEY" \
   -H "Content-Type: application/json" \
   -d "$DATA" | jq '.'
