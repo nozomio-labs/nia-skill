@@ -8,9 +8,10 @@ if [ -z "$1" ]; then echo "Usage: datasets-index.sh dataset_name_or_url"; exit 1
 
 DATASET="$1"
 
-DATA=$(jq -n --arg u "$DATASET" '{url: $u}')
+# New unified /sources endpoint with type discriminator
+DATA=$(jq -n --arg u "$DATASET" '{type: "huggingface_dataset", url: $u}')
 
-curl -s -X POST "https://apigcp.trynia.ai/v2/huggingface-datasets" \
+curl -s -X POST "https://apigcp.trynia.ai/v2/sources" \
   -H "Authorization: Bearer $NIA_KEY" \
   -H "Content-Type: application/json" \
   -d "$DATA" | jq '.'

@@ -32,12 +32,14 @@ else
   MODE="unified"
 fi
 
+# New unified /search endpoint with mode discriminator
 DATA=$(jq -n \
   --arg q "$QUERY" \
   --arg mode "$MODE" \
   --argjson repos "$REPOS_JSON" \
   --argjson docs "$DOCS_JSON" \
   '{
+    mode: "query",
     messages: [{role: "user", content: $q}],
     repositories: $repos,
     data_sources: $docs,
@@ -46,7 +48,7 @@ DATA=$(jq -n \
     include_sources: true
   }')
 
-curl -s -X POST "https://apigcp.trynia.ai/v2/search/query" \
+curl -s -X POST "https://apigcp.trynia.ai/v2/search" \
   -H "Authorization: Bearer $NIA_KEY" \
   -H "Content-Type: application/json" \
   -d "$DATA" | jq '.'
