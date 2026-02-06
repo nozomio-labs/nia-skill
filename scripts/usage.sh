@@ -1,8 +1,7 @@
 #!/bin/bash
-# Get API usage summary: usage.sh
+# Nia Usage — show your current API usage stats (requests, tokens, limits)
 set -e
-NIA_KEY=$(cat ~/.config/nia/api_key 2>/dev/null || echo "")
-if [ -z "$NIA_KEY" ]; then echo "Error: No API key found"; exit 1; fi
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib.sh"
 
-curl -s "https://apigcp.trynia.ai/v2/usage" \
-  -H "Authorization: Bearer $NIA_KEY" | jq '.'
+nia_get "$BASE_URL/usage"
