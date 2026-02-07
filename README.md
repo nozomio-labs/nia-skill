@@ -62,6 +62,7 @@ Nia provides tools for indexing and searching external repositories, research pa
 | `package-grep.sh` | Search package source code |
 | `global-subscribe.sh` | Subscribe to public source |
 | `oracle.sh` | Run autonomous research (Pro) |
+| `tracer.sh` | Search GitHub repos without indexing (Pro) |
 
 ## Documentation
 
