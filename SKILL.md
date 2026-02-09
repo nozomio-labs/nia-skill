@@ -21,10 +21,20 @@ Either:
 
 ### Store the key
 
+Set the `NIA_API_KEY` environment variable:
+
+```bash
+export NIA_API_KEY="your-api-key-here"
+```
+
+Or store it in a config file:
+
 ```bash
 mkdir -p ~/.config/nia
 echo "your-api-key-here" > ~/.config/nia/api_key
 ```
+
+> **Note:** `NIA_API_KEY` environment variable takes precedence over the config file.
 
 ### Requirements
 

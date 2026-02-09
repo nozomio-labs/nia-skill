@@ -5,9 +5,13 @@
 BASE_URL="https://apigcp.trynia.ai/v2"
 
 nia_auth() {
-  NIA_KEY=$(cat ~/.config/nia/api_key 2>/dev/null || echo "")
+  if [ -n "${NIA_API_KEY:-}" ]; then
+    NIA_KEY="$NIA_API_KEY"
+  else
+    NIA_KEY=$(cat ~/.config/nia/api_key 2>/dev/null || echo "")
+  fi
   if [ -z "$NIA_KEY" ]; then
-    echo "Error: No API key found. Run: echo 'your-key' > ~/.config/nia/api_key"
+    echo "Error: No API key found. Set NIA_API_KEY env variable or run: echo 'your-key' > ~/.config/nia/api_key"
     exit 1
   fi
   export NIA_KEY

@@ -13,10 +13,19 @@ Nia provides tools for indexing and searching external repositories, research pa
    - Or sign up at [trynia.ai](https://trynia.ai)
 
 2. Store the key:
+
+   Set the `NIA_API_KEY` environment variable:
+   ```bash
+   export NIA_API_KEY="your-api-key"
+   ```
+
+   Or use a config file:
    ```bash
    mkdir -p ~/.config/nia
    echo "your-api-key" > ~/.config/nia/api_key
    ```
+
+   > `NIA_API_KEY` takes precedence over the config file.
 
 3. Requirements: `curl`, `jq`
 
