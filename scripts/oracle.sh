@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Oracle — autonomous research agent
 # Usage: oracle.sh <command> [args...]
 set -e

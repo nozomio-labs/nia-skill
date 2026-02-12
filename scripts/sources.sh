@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Sources — unified source management
 # Usage: sources.sh <command> [args...]
 set -e

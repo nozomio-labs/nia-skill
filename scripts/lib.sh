@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Shared library for Nia API scripts
 # Source this file: source "$(dirname "$0")/lib.sh"
 

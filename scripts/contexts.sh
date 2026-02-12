@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Contexts — cross-agent conversation context sharing
 # Usage: contexts.sh <command> [args...]
 set -e

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Datasets — HuggingFace dataset management
 # Usage: datasets.sh <command> [args...]
 set -e

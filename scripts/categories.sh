@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Categories — organize sources into categories
 # Usage: categories.sh <command> [args...]
 set -e

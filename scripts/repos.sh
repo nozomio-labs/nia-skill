@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Repositories — repository management
 # Usage: repos.sh <command> [args...]
 set -e
