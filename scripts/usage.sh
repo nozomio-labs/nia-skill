@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Usage — show your current API usage stats (requests, tokens, limits)
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

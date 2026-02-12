@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Local Folders — private file storage and search
 # Usage: folders.sh <command> [args...]
 set -e

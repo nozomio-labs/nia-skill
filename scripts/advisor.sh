@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Advisor — get AI code advice grounded in your indexed repos and docs
 # Pass local files + a question; Nia searches your sources and returns a targeted answer.
 # Usage: advisor.sh "query" <files...>

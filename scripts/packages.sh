@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Packages — search package source code
 # Usage: packages.sh <command> [args...]
 # Registry: npm | py_pi | crates_io | golang_proxy

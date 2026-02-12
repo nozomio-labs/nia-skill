@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Tracer — autonomous GitHub code search agent
 # Usage: tracer.sh <command> [args...]
 set -e

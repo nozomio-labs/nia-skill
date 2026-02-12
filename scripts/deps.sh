@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Dependencies — analyze and subscribe to dependency docs
 # Usage: deps.sh <command> [args...]
 set -e

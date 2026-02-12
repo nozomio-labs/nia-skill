@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Papers — research paper management
 # Usage: papers.sh <command> [args...]
 set -e

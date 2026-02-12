@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Nia Search — query, web, deep, universal
 # Usage: search.sh <command> [args...]
 set -e
