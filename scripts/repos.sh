@@ -30,14 +30,14 @@ cmd_list() {
 cmd_status() {
   if [ -z "$1" ]; then echo "Usage: repos.sh status <owner/repo>"; return 1; fi
   local rid=$(echo "$1" | sed 's/\//%2F/g')
-  nia_get "$BASE_URL/repositories/${rid}"
+  nia_get "$BASE_URL/sources/${rid}?type=repository"
 }
 
 # ─── read — read a single file's content from an indexed repo
 cmd_read() {
   if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: repos.sh read <owner/repo> <path/to/file>"; return 1; fi
   local rid=$(echo "$1" | sed 's/\//%2F/g') fp=$(echo "$2" | sed 's/\//%2F/g')
-  nia_get_raw "$BASE_URL/repositories/${rid}/content?path=${fp}" | jq -r '.content // .'
+  nia_get_raw "$BASE_URL/sources/${rid}/content?type=repository&path=${fp}" | jq -r '.content // .'
 }
 
 # ─── grep — regex search across all files in an indexed repo
@@ -54,7 +54,7 @@ cmd_grep() {
   if [ -n "${REF:-}" ]; then
     DATA=$(echo "$DATA" | jq --arg ref "$REF" '. + {ref: $ref}')
   fi
-  nia_post "$BASE_URL/repositories/${rid}/grep" "$DATA"
+  nia_post "$BASE_URL/sources/${rid}/grep" "$DATA"
 }
 
 # ─── tree — print the file tree of an indexed repo, with optional filters
@@ -72,8 +72,7 @@ cmd_tree() {
   if [ -n "${FILE_EXTENSIONS:-}" ]; then params="${params}&file_extensions=${FILE_EXTENSIONS}"; fi
   if [ -n "${EXCLUDE_EXTENSIONS:-}" ]; then params="${params}&exclude_extensions=${EXCLUDE_EXTENSIONS}"; fi
   if [ "${SHOW_FULL_PATHS:-}" = "true" ]; then params="${params}&show_full_paths=true"; fi
-  local url="$BASE_URL/repositories/${rid}/tree"
-  if [ -n "$params" ]; then url="${url}?${params#&}"; fi
+  local url="$BASE_URL/sources/${rid}/tree?type=repository${params}"
   nia_get_raw "$url" | jq '.formatted_tree // .'
 }
 
@@ -81,15 +80,15 @@ cmd_tree() {
 cmd_delete() {
   if [ -z "$1" ]; then echo "Usage: repos.sh delete <owner/repo>"; return 1; fi
   local rid=$(echo "$1" | sed 's/\//%2F/g')
-  nia_delete "$BASE_URL/repositories/${rid}"
+  nia_delete "$BASE_URL/sources/${rid}?type=repository"
 }
 
 # ─── rename — change the display name of an indexed repo
 cmd_rename() {
   if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: repos.sh rename <owner/repo> <new_name>"; return 1; fi
   local rid=$(echo "$1" | sed 's/\//%2F/g')
-  DATA=$(jq -n --arg name "$2" '{new_name: $name}')
-  nia_patch "$BASE_URL/repositories/${rid}/rename" "$DATA"
+  DATA=$(jq -n --arg name "$2" '{display_name: $name}')
+  nia_patch "$BASE_URL/sources/${rid}?type=repository" "$DATA"
 }
 
 # ─── dispatch ─────────────────────────────────────────────────────────────────

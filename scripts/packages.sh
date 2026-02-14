@@ -26,7 +26,7 @@ cmd_grep() {
     + (if $cl != "" then {c: ($cl | tonumber)} else {} end)
     + (if $om != "" then {output_mode: $om} else {} end)
     + (if $sha != "" then {filename_sha256: $sha} else {} end)')
-  nia_post "$BASE_URL/package-search/grep" "$DATA"
+  nia_post "$BASE_URL/packages/grep" "$DATA"
 }
 
 # ─── hybrid — semantic + regex combo search across a package's source files
@@ -45,7 +45,7 @@ cmd_hybrid() {
     + (if $pat != "" then {pattern: $pat} else {} end)
     + (if $lang != "" then {language: $lang} else {} end)
     + (if $sha != "" then {filename_sha256: $sha} else {} end)')
-  nia_post "$BASE_URL/package-search/hybrid" "$DATA"
+  nia_post "$BASE_URL/packages/search" "$DATA"
 }
 
 # ─── read — read specific lines from a package file by its SHA256 hash
@@ -59,7 +59,7 @@ cmd_read() {
     --argjson start "$4" --argjson end "$5" --arg ver "${6:-}" \
     '{registry: $reg, package_name: $pkg, filename_sha256: $sha, start_line: $start, end_line: $end}
     + (if $ver != "" then {version: $ver} else {} end)')
-  nia_post "$BASE_URL/package-search/read-file" "$DATA"
+  nia_post "$BASE_URL/packages/read" "$DATA"
 }
 
 # ─── dispatch ─────────────────────────────────────────────────────────────────

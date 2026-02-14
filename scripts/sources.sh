@@ -121,11 +121,12 @@ cmd_sync() {
   nia_post "$url" "{}"
 }
 
-# ─── rename — change the display name of any data source
+# ─── rename — change the display name of any source
 cmd_rename() {
-  if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: sources.sh rename <source_id_or_name> <new_name>"; return 1; fi
-  DATA=$(jq -n --arg id "$1" --arg name "$2" '{identifier: $id, new_name: $name}')
-  nia_patch "$BASE_URL/data-sources/rename" "$DATA"
+  if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: sources.sh rename <source_id> <new_name>"; return 1; fi
+  local sid=$(urlencode "$1")
+  DATA=$(jq -n --arg name "$2" '{display_name: $name}')
+  nia_patch "$BASE_URL/sources/${sid}" "$DATA"
 }
 
 # ─── subscribe — add a publicly indexed global source to your account
@@ -137,7 +138,7 @@ cmd_subscribe() {
   fi
   DATA=$(jq -n --arg u "$1" --arg st "${2:-}" --arg ref "${3:-}" \
     '{url: $u} + (if $st != "" then {source_type: $st} else {} end) + (if $ref != "" then {ref: $ref} else {} end)')
-  nia_post "$BASE_URL/global-sources/subscribe" "$DATA"
+  nia_post "$BASE_URL/sources/subscribe" "$DATA"
 }
 
 # ─── read — read file content from an indexed source by path and optional line range
@@ -148,7 +149,7 @@ cmd_read() {
     return 1
   fi
   local sid=$(urlencode "$1") path=$(echo "$2" | sed 's/ /%20/g')
-  local url="$BASE_URL/data-sources/${sid}/read?path=${path}"
+  local url="$BASE_URL/sources/${sid}/content?path=${path}"
   if [ -n "${3:-}" ]; then url="${url}&line_start=$3"; fi
   if [ -n "${4:-}" ]; then url="${url}&line_end=$4"; fi
   if [ -n "${MAX_LENGTH:-}" ]; then url="${url}&max_length=${MAX_LENGTH}"; fi
@@ -165,21 +166,21 @@ cmd_grep() {
   fi
   local sid=$(urlencode "$1")
   DATA=$(build_grep_json "$2" "${3:-}")
-  nia_post "$BASE_URL/data-sources/${sid}/grep" "$DATA"
+  nia_post "$BASE_URL/sources/${sid}/grep" "$DATA"
 }
 
 # ─── tree — print the full file tree of a source
 cmd_tree() {
   if [ -z "$1" ]; then echo "Usage: sources.sh tree <source_id>"; return 1; fi
   local sid=$(urlencode "$1")
-  nia_get_raw "$BASE_URL/data-sources/${sid}/tree" | jq '.tree_string // .'
+  nia_get_raw "$BASE_URL/sources/${sid}/tree" | jq '.tree_string // .'
 }
 
 # ─── ls — list files/dirs in a specific path within a source
 cmd_ls() {
   if [ -z "$1" ]; then echo "Usage: sources.sh ls <source_id> [path]"; return 1; fi
   local sid=$(echo "$1" | jq -Rr @uri) dir=$(echo "${2:-/}" | jq -Rr @uri)
-  nia_get "$BASE_URL/data-sources/${sid}/ls?path=${dir}"
+  nia_get "$BASE_URL/sources/${sid}/tree?path=${dir}"
 }
 
 # ─── classification — get or update the auto-classification for a source
@@ -204,7 +205,7 @@ cmd_assign_category() {
   else
     DATA=$(jq -n --arg c "$cat_id" '{category_id: $c}')
   fi
-  nia_patch "$BASE_URL/data-sources/${sid}/category" "$DATA"
+  nia_patch "$BASE_URL/sources/${sid}" "$DATA"
 }
 
 # ─── dispatch ─────────────────────────────────────────────────────────────────
