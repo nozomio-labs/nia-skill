@@ -9,7 +9,11 @@ source "$SCRIPT_DIR/lib.sh"
 cmd_query() {
   if [ -z "$1" ]; then
     echo "Usage: search.sh query <query> <repos_csv> [docs_csv]"
-    echo "  Env: LOCAL_FOLDERS, CATEGORY, MAX_TOKENS"
+    echo "  Env: LOCAL_FOLDERS, SLACK_WORKSPACES, CATEGORY, MAX_TOKENS,"
+    echo "       FAST_MODE, SKIP_LLM, REASONING_STRATEGY, MODEL,"
+    echo "       BYPASS_CACHE, INCLUDE_FOLLOW_UPS"
+    echo "  Slack filter env: SLACK_CHANNELS, SLACK_USERS, SLACK_DATE_FROM,"
+    echo "       SLACK_DATE_TO, SLACK_INCLUDE_THREADS"
     return 1
   fi
   local query="$1" repos="${2:-}" docs="${3:-}"
@@ -22,19 +26,49 @@ cmd_query() {
   if [ -n "${LOCAL_FOLDERS:-}" ]; then
     FOLDERS_JSON=$(echo "$LOCAL_FOLDERS" | tr ',' '\n' | jq -R '.' | jq -s '.')
   else FOLDERS_JSON="[]"; fi
+  if [ -n "${SLACK_WORKSPACES:-}" ]; then
+    SLACK_JSON=$(echo "$SLACK_WORKSPACES" | tr ',' '\n' | jq -R '.' | jq -s '.')
+  else SLACK_JSON="[]"; fi
+  # Build slack_filters if any slack filter env is set
+  SLACK_FILTERS="null"
+  if [ -n "${SLACK_CHANNELS:-}${SLACK_USERS:-}${SLACK_DATE_FROM:-}${SLACK_DATE_TO:-}${SLACK_INCLUDE_THREADS:-}" ]; then
+    SLACK_FILTERS=$(jq -n \
+      --arg ch "${SLACK_CHANNELS:-}" --arg us "${SLACK_USERS:-}" \
+      --arg df "${SLACK_DATE_FROM:-}" --arg dt "${SLACK_DATE_TO:-}" \
+      --arg it "${SLACK_INCLUDE_THREADS:-}" \
+      '{}
+      + (if $ch != "" then {channels: ($ch | split(","))} else {} end)
+      + (if $us != "" then {users: ($us | split(","))} else {} end)
+      + (if $df != "" then {date_from: $df} else {} end)
+      + (if $dt != "" then {date_to: $dt} else {} end)
+      + (if $it != "" then {include_threads: ($it == "true")} else {} end)')
+  fi
   # Auto-detect search mode
   if [ -n "$repos" ] && [ -z "$docs" ]; then MODE="repositories"
   elif [ -z "$repos" ] && [ -n "$docs" ]; then MODE="sources"
   else MODE="unified"; fi
   DATA=$(jq -n \
     --arg q "$query" --arg mode "$MODE" \
-    --argjson repos "$REPOS_JSON" --argjson docs "$DOCS_JSON" --argjson folders "$FOLDERS_JSON" \
+    --argjson repos "$REPOS_JSON" --argjson docs "$DOCS_JSON" \
+    --argjson folders "$FOLDERS_JSON" --argjson slack "$SLACK_JSON" \
+    --argjson slack_filters "$SLACK_FILTERS" \
     --arg cat "${CATEGORY:-}" --arg mt "${MAX_TOKENS:-}" \
+    --arg fast "${FAST_MODE:-}" --arg skip "${SKIP_LLM:-}" \
+    --arg rs "${REASONING_STRATEGY:-}" --arg model "${MODEL:-}" \
+    --arg bc "${BYPASS_CACHE:-}" --arg ifu "${INCLUDE_FOLLOW_UPS:-}" \
     '{mode: "query", messages: [{role: "user", content: $q}], repositories: $repos,
      data_sources: $docs, search_mode: $mode, stream: false, include_sources: true}
     + (if ($folders | length) > 0 then {local_folders: $folders} else {} end)
+    + (if ($slack | length) > 0 then {slack_workspaces: $slack} else {} end)
+    + (if $slack_filters != null then {slack_filters: $slack_filters} else {} end)
     + (if $cat != "" then {category: $cat} else {} end)
-    + (if $mt != "" then {max_tokens: ($mt | tonumber)} else {} end)')
+    + (if $mt != "" then {max_tokens: ($mt | tonumber)} else {} end)
+    + (if $fast != "" then {fast_mode: ($fast == "true")} else {} end)
+    + (if $skip != "" then {skip_llm: ($skip == "true")} else {} end)
+    + (if $rs != "" then {reasoning_strategy: $rs} else {} end)
+    + (if $model != "" then {model: $model} else {} end)
+    + (if $bc != "" then {bypass_semantic_cache: ($bc == "true")} else {} end)
+    + (if $ifu != "" then {include_follow_ups: ($ifu == "true")} else {} end)')
   nia_post "$BASE_URL/search" "$DATA"
 }
 

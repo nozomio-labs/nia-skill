@@ -84,6 +84,17 @@ cmd_session_chat() {
   nia_stream "$BASE_URL/oracle/sessions/$1/chat/stream" "$DATA"
 }
 
+# ─── session-delete — delete a research session and its chat messages
+cmd_session_delete() {
+  if [ -z "$1" ]; then echo "Usage: oracle.sh session-delete <session_id>"; return 1; fi
+  nia_delete "$BASE_URL/oracle/sessions/$1"
+}
+
+# ─── 1m-usage — get daily usage for 1M context window models
+cmd_1m_usage() {
+  nia_get "$BASE_URL/oracle/1m-usage"
+}
+
 # ─── dispatch ─────────────────────────────────────────────────────────────────
 case "${1:-}" in
   run)              shift; cmd_run "$@" ;;
@@ -95,6 +106,8 @@ case "${1:-}" in
   session-detail)   shift; cmd_session_detail "$@" ;;
   session-messages) shift; cmd_session_messages "$@" ;;
   session-chat)     shift; cmd_session_chat "$@" ;;
+  session-delete)   shift; cmd_session_delete "$@" ;;
+  1m-usage)         shift; cmd_1m_usage "$@" ;;
   *)
     echo "Usage: $(basename "$0") <command> [args...]"
     echo ""
@@ -108,6 +121,8 @@ case "${1:-}" in
     echo "  session-detail   Get session details"
     echo "  session-messages Get session messages"
     echo "  session-chat     Follow-up chat on session (SSE stream)"
+    echo "  session-delete   Delete a session"
+    echo "  1m-usage         Get daily 1M context usage"
     exit 1
     ;;
 esac

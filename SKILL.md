@@ -1,13 +1,13 @@
 ---
 slug: nia
 name: Nia
-description: Index and search code repositories, documentation, research papers, HuggingFace datasets, local folders, and packages with Nia AI. Includes Oracle autonomous research, dependency analysis, context sharing, and code advisor.
+description: Index and search code repositories, documentation, research papers, HuggingFace datasets, local folders, Slack workspaces, and packages with Nia AI. Includes Oracle autonomous research, GitHub live search, dependency analysis, context sharing, and code advisor.
 homepage: https://trynia.ai
 ---
 
 # Nia Skill
 
-Direct API access to [Nia](https://trynia.ai) for indexing and searching code repositories, documentation, research papers, HuggingFace datasets, local folders, and packages.
+Direct API access to [Nia](https://trynia.ai) for indexing and searching code repositories, documentation, research papers, HuggingFace datasets, local folders, Slack workspaces, and packages.
 
 Nia provides tools for indexing and searching external repositories, research papers, documentation, packages, and performing AI-powered research. Its primary goal is to reduce hallucinations in LLMs and provide up-to-date context for AI agents.
 
@@ -76,7 +76,7 @@ Run any script without arguments to see available commands and usage.
 
 ```bash
 ./scripts/sources.sh index "https://docs.example.com" [limit]   # Index docs
-./scripts/sources.sh list [type]                                  # List sources (documentation|research_paper|huggingface_dataset|local_folder)
+./scripts/sources.sh list [type]                                  # List sources (documentation|research_paper|huggingface_dataset|local_folder|slack)
 ./scripts/sources.sh get <source_id> [type]                       # Get source details
 ./scripts/sources.sh resolve <identifier> [type]                  # Resolve name/URL to ID
 ./scripts/sources.sh update <source_id> [display_name] [cat_id]   # Update source
@@ -90,6 +90,8 @@ Run any script without arguments to see available commands and usage.
 ./scripts/sources.sh ls <source_id> [path]                        # List directory
 ./scripts/sources.sh classification <source_id> [type]            # Get classification
 ./scripts/sources.sh assign-category <source_id> <cat_id|null>    # Assign category
+./scripts/sources.sh upload-url <filename>                        # Get signed URL for PDF upload
+./scripts/sources.sh bulk-delete <id:type> [id:type ...]          # Bulk delete resources
 ```
 
 **Index environment variables**: `DISPLAY_NAME`, `FOCUS`, `EXTRACT_BRANDING`, `EXTRACT_IMAGES`, `IS_PDF`, `URL_PATTERNS`, `EXCLUDE_PATTERNS`, `MAX_DEPTH`, `WAIT_FOR`, `CHECK_LLMS_TXT`, `LLMS_TXT_STRATEGY`, `INCLUDE_SCREENSHOT`, `ONLY_MAIN_CONTENT`, `ADD_GLOBAL`, `MAX_AGE`
@@ -125,7 +127,7 @@ Run any script without arguments to see available commands and usage.
 ./scripts/search.sh deep <query> [output_format]                 # Deep research (Pro)
 ```
 
-**query** — targeted search with AI response and sources. Env: `LOCAL_FOLDERS`, `CATEGORY`, `MAX_TOKENS`
+**query** — targeted search with AI response and sources. Env: `LOCAL_FOLDERS`, `SLACK_WORKSPACES`, `CATEGORY`, `MAX_TOKENS`, `FAST_MODE`, `SKIP_LLM`, `REASONING_STRATEGY` (vector|tree|hybrid), `MODEL`, `BYPASS_CACHE`, `INCLUDE_FOLLOW_UPS`. Slack filters: `SLACK_CHANNELS`, `SLACK_USERS`, `SLACK_DATE_FROM`, `SLACK_DATE_TO`, `SLACK_INCLUDE_THREADS`
 **universal** — hybrid vector + BM25 across all indexed sources. Env: `INCLUDE_REPOS`, `INCLUDE_DOCS`, `INCLUDE_HF`, `ALPHA`, `COMPRESS`, `MAX_TOKENS`, `BOOST_LANGUAGES`, `EXPAND_SYMBOLS`
 **web** — web search. Env: `CATEGORY` (github|company|research|news|tweet|pdf|blog), `DAYS_BACK`, `FIND_SIMILAR_TO`
 **deep** — deep AI research (Pro). Env: `VERBOSE`
@@ -142,6 +144,8 @@ Run any script without arguments to see available commands and usage.
 ./scripts/oracle.sh session-detail <session_id>                  # Get session details
 ./scripts/oracle.sh session-messages <session_id> [limit]        # Get session messages
 ./scripts/oracle.sh session-chat <session_id> <message>          # Follow-up chat (SSE stream)
+./scripts/oracle.sh session-delete <session_id>                  # Delete session and messages
+./scripts/oracle.sh 1m-usage                                     # Get daily 1M context usage
 ```
 
 **Environment variables**: `OUTPUT_FORMAT`, `MODEL` (claude-opus-4-6|claude-sonnet-4-5-20250929|...)
@@ -177,6 +181,46 @@ Autonomous agent for searching GitHub repositories without indexing. Powered by 
 - Exploring unfamiliar repositories
 - Searching code you haven't indexed
 - Finding implementation examples across repos
+
+### slack.sh — Slack Integration
+
+```bash
+./scripts/slack.sh install                                        # Generate Slack OAuth URL
+./scripts/slack.sh callback <code> [redirect_uri]                 # Exchange OAuth code for tokens
+./scripts/slack.sh register-token <xoxb-token> [name]             # Register external bot token (BYOT)
+./scripts/slack.sh list                                           # List Slack installations
+./scripts/slack.sh get <installation_id>                          # Get installation details
+./scripts/slack.sh delete <installation_id>                       # Disconnect workspace
+./scripts/slack.sh channels <installation_id>                     # List available channels
+./scripts/slack.sh configure-channels <inst_id> [mode]            # Configure channels to index
+./scripts/slack.sh grep <installation_id> <pattern> [channel]     # BM25 search indexed messages
+./scripts/slack.sh index <installation_id>                        # Trigger full re-index
+./scripts/slack.sh messages <installation_id> [channel] [limit]   # Read recent messages (live)
+./scripts/slack.sh status <installation_id>                       # Get indexing status
+```
+
+**configure-channels** env: `INCLUDE_CHANNELS` (csv of channel IDs), `EXCLUDE_CHANNELS` (csv)
+**install** env: `REDIRECT_URI`, `SCOPES` (csv)
+
+**Workflow:**
+1. `slack.sh install` → get OAuth URL → user authorizes → `slack.sh callback <code>`
+2. Or use BYOT: `slack.sh register-token xoxb-your-token "My Workspace"`
+3. `slack.sh channels <id>` → see available channels
+4. `slack.sh configure-channels <id> selected` with `INCLUDE_CHANNELS=C01,C02`
+5. `slack.sh index <id>` → trigger indexing
+6. `slack.sh grep <id> "search term"` → search indexed messages
+7. Use in search: `SLACK_WORKSPACES=<id> ./scripts/search.sh query "question"`
+
+### github.sh — Live GitHub Search (No Indexing Required)
+
+```bash
+./scripts/github.sh glob <owner/repo> <pattern> [ref]            # Find files matching glob
+./scripts/github.sh read <owner/repo> <path> [ref] [start] [end] # Read file with line range
+./scripts/github.sh search <owner/repo> <query> [per_page] [page]# Code search (GitHub API)
+./scripts/github.sh tree <owner/repo> [ref] [path]               # Get file tree
+```
+
+Rate limited to 10 req/min by GitHub for code search. For indexed repo operations use `repos.sh`. For autonomous research use `tracer.sh`.
 
 ### papers.sh — Research Papers (arXiv)
 
@@ -291,6 +335,7 @@ Analyzes your code against indexed docs. Env: `REPOS` (csv), `DOCS` (csv), `OUTP
 | Research Paper | `papers.sh index` | `2312.00752`, arXiv URL |
 | HuggingFace Dataset | `datasets.sh index` | `squad`, `owner/dataset` |
 | Local Folder | `folders.sh create` | UUID, display name (private, user-scoped) |
+| Slack | `slack.sh register-token` / OAuth | installation ID |
 
 ### Search Modes
 
@@ -303,3 +348,4 @@ Pass sources via:
 - `repositories` arg: comma-separated `"owner/repo,owner2/repo2"`
 - `data_sources` arg: comma-separated `"display-name,uuid,https://url"`
 - `LOCAL_FOLDERS` env: comma-separated `"folder-uuid,My Notes"`
+- `SLACK_WORKSPACES` env: comma-separated installation IDs

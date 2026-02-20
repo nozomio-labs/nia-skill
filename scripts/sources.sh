@@ -208,6 +208,34 @@ cmd_assign_category() {
   nia_patch "$BASE_URL/sources/${sid}" "$DATA"
 }
 
+# ─── upload-url — get a signed URL for direct PDF upload
+cmd_upload_url() {
+  if [ -z "$1" ]; then
+    echo "Usage: sources.sh upload-url <filename>"
+    echo "  Returns signed URL for HTTP PUT upload and gcs_path for create-source"
+    return 1
+  fi
+  DATA=$(jq -n --arg fn "$1" '{filename: $fn, content_type: "application/pdf"}')
+  nia_post "$BASE_URL/sources/upload-url" "$DATA"
+}
+
+# ─── bulk-delete — delete multiple resources in a single request
+cmd_bulk_delete() {
+  if [ -z "$1" ]; then
+    echo "Usage: sources.sh bulk-delete <id:type> [id:type ...]"
+    echo "  type: repository|documentation|research_paper|context|local_folder"
+    echo "  Example: sources.sh bulk-delete abc123:repository def456:documentation"
+    return 1
+  fi
+  local items="[]"
+  for item in "$@"; do
+    local id="${item%%:*}" type="${item#*:}"
+    items=$(echo "$items" | jq --arg id "$id" --arg t "$type" '. + [{id: $id, type: $t}]')
+  done
+  DATA=$(jq -n --argjson items "$items" '{items: $items}')
+  nia_post "$BASE_URL/bulk-delete" "$DATA"
+}
+
 # ─── dispatch ─────────────────────────────────────────────────────────────────
 case "${1:-}" in
   index)            shift; cmd_index "$@" ;;
@@ -225,12 +253,14 @@ case "${1:-}" in
   ls)               shift; cmd_ls "$@" ;;
   classification)   shift; cmd_classification "$@" ;;
   assign-category)  shift; cmd_assign_category "$@" ;;
+  upload-url)       shift; cmd_upload_url "$@" ;;
+  bulk-delete)      shift; cmd_bulk_delete "$@" ;;
   *)
     echo "Usage: $(basename "$0") <command> [args...]"
     echo ""
     echo "Commands:"
     echo "  index            Index a documentation site"
-    echo "  list [type]      List sources (repo|documentation|research_paper|huggingface_dataset|local_folder)"
+    echo "  list [type]      List sources (repo|documentation|research_paper|huggingface_dataset|local_folder|slack)"
     echo "  get              Get source details"
     echo "  resolve          Resolve source by name/URL"
     echo "  update           Update source display name / category"
@@ -244,6 +274,8 @@ case "${1:-}" in
     echo "  ls               List directory in source"
     echo "  classification   Get/update source classification"
     echo "  assign-category  Assign category to source"
+    echo "  upload-url       Get signed URL for PDF upload"
+    echo "  bulk-delete      Delete multiple resources at once"
     exit 1
     ;;
 esac
