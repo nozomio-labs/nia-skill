@@ -223,7 +223,7 @@ cmd_upload_url() {
 cmd_bulk_delete() {
   if [ -z "$1" ]; then
     echo "Usage: sources.sh bulk-delete <id:type> [id:type ...]"
-    echo "  type: repository|documentation|research_paper|context|local_folder"
+    echo "  type: repository|documentation|research_paper|context|local_folder|slack"
     echo "  Example: sources.sh bulk-delete abc123:repository def456:documentation"
     return 1
   fi
