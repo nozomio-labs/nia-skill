@@ -44,18 +44,21 @@ echo "your-api-key-here" > ~/.config/nia/api_key
 ## Nia-First Workflow
 
 **BEFORE using web fetch or web search, you MUST:**
-1. **Check indexed sources first**: `./scripts/sources.sh list` or `./scripts/repos.sh list`
-2. **If source exists**: Use `search.sh universal`, `repos.sh grep`, `sources.sh read` for targeted queries
-3. **If source doesn't exist but you know the URL**: Index it with `repos.sh index` or `sources.sh index`, then search
-4. **Only if source unknown**: Use `search.sh web` or `search.sh deep` to discover URLs, then index
+1. **Check ALL indexed sources first**: `./scripts/repos.sh list`, `./scripts/sources.sh list`, and `./scripts/slack.sh list`
+2. **If source exists**: Use `search.sh query` (with `SLACK_WORKSPACES` env for Slack), `repos.sh grep`, `sources.sh read` for targeted queries
+3. **If Slack workspace is connected**: Use `SLACK_WORKSPACES=<installation_id> ./scripts/search.sh query "question"` to search Slack messages, or `slack.sh grep` / `slack.sh messages` for direct access
+4. **If source doesn't exist but you know the URL**: Index it with `repos.sh index` or `sources.sh index`, then search
+5. **Only if source unknown**: Use `search.sh web` or `search.sh deep` to discover URLs, then index
 
 **Why this matters**: Indexed sources provide more accurate, complete context than web fetches. Web fetch returns truncated/summarized content while Nia provides full source code and documentation.
 
+**IMPORTANT**: `search.sh universal` does NOT search Slack workspaces. To search Slack, you MUST use `search.sh query` with the `SLACK_WORKSPACES` env var, or use `slack.sh grep` / `slack.sh messages` directly.
+
 ## Deterministic Workflow
 
-1. Check if the source is already indexed using `repos.sh list` / `sources.sh list`
-2. If indexed, check the tree with `repos.sh tree` / `sources.sh tree`
-3. After getting the structure, use `search.sh universal`, `repos.sh grep`, `repos.sh read` for targeted searches
+1. Check if the source is already indexed using `repos.sh list` / `sources.sh list` / `slack.sh list`
+2. If indexed, check the tree with `repos.sh tree` / `sources.sh tree` / `slack.sh channels <id>`
+3. After getting the structure, use `search.sh query` (with `SLACK_WORKSPACES` for Slack), `repos.sh grep`, `repos.sh read` for targeted searches
 4. Save findings in an .md file to track indexed sources for future use
 
 ## Notes
@@ -127,8 +130,8 @@ Run any script without arguments to see available commands and usage.
 ./scripts/search.sh deep <query> [output_format]                 # Deep research (Pro)
 ```
 
-**query** — targeted search with AI response and sources. Env: `LOCAL_FOLDERS`, `SLACK_WORKSPACES`, `CATEGORY`, `MAX_TOKENS`, `FAST_MODE`, `SKIP_LLM`, `REASONING_STRATEGY` (vector|tree|hybrid), `MODEL`, `BYPASS_CACHE`, `INCLUDE_FOLLOW_UPS`. Slack filters: `SLACK_CHANNELS`, `SLACK_USERS`, `SLACK_DATE_FROM`, `SLACK_DATE_TO`, `SLACK_INCLUDE_THREADS`
-**universal** — hybrid vector + BM25 across all indexed sources. Env: `INCLUDE_REPOS`, `INCLUDE_DOCS`, `INCLUDE_HF`, `ALPHA`, `COMPRESS`, `MAX_TOKENS`, `BOOST_LANGUAGES`, `EXPAND_SYMBOLS`
+**query** — targeted search with AI response and sources. Env: `LOCAL_FOLDERS`, `SLACK_WORKSPACES`, `CATEGORY`, `MAX_TOKENS`, `FAST_MODE`, `SKIP_LLM`, `REASONING_STRATEGY` (vector|tree|hybrid), `MODEL`, `BYPASS_CACHE`, `INCLUDE_FOLLOW_UPS`. Slack filters: `SLACK_CHANNELS`, `SLACK_USERS`, `SLACK_DATE_FROM`, `SLACK_DATE_TO`, `SLACK_INCLUDE_THREADS`. **This is the only search command that supports Slack.**
+**universal** — hybrid vector + BM25 across all indexed public sources (repos + docs + HF datasets). **Does NOT include Slack.** Env: `INCLUDE_REPOS`, `INCLUDE_DOCS`, `INCLUDE_HF`, `ALPHA`, `COMPRESS`, `MAX_TOKENS`, `BOOST_LANGUAGES`, `EXPAND_SYMBOLS`
 **web** — web search. Env: `CATEGORY` (github|company|research|news|tweet|pdf|blog), `DAYS_BACK`, `FIND_SIMILAR_TO`
 **deep** — deep AI research (Pro). Env: `VERBOSE`
 
