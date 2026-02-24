@@ -22,13 +22,23 @@ urlencode() {
 }
 
 # Generic curl wrapper: nia_curl METHOD URL [DATA]
+# Captures HTTP status code and returns JSON. Non-JSON errors (e.g. rate limits) are wrapped.
 nia_curl() {
   local method="$1" url="$2" data="${3:-}"
-  local args=(-s -X "$method" "$url" -H "Authorization: Bearer $NIA_KEY")
+  local args=(-s -w '\n__HTTP_STATUS:%{http_code}' -X "$method" "$url" -H "Authorization: Bearer $NIA_KEY")
   if [ -n "$data" ]; then
     args+=(-H "Content-Type: application/json" -d "$data")
   fi
-  curl "${args[@]}"
+  local response
+  response=$(curl "${args[@]}" 2>&1)
+  local http_status="${response##*__HTTP_STATUS:}"
+  local body="${response%__HTTP_STATUS:*}"
+  # If body is valid JSON, output it; otherwise wrap the plain text as a JSON error
+  if echo "$body" | jq '.' >/dev/null 2>&1; then
+    echo "$body"
+  else
+    jq -n --arg msg "$body" --arg code "$http_status" '{error: $msg, http_status: ($code | tonumber)}'
+  fi
 }
 
 nia_get()    { nia_curl GET    "$1" | jq '.'; }
