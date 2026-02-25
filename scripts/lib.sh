@@ -30,14 +30,16 @@ nia_curl() {
     args+=(-H "Content-Type: application/json" -d "$data")
   fi
   local response
-  response=$(curl "${args[@]}" 2>&1)
+  response=$(curl "${args[@]}" 2>/dev/null) || true
   local http_status="${response##*__HTTP_STATUS:}"
   local body="${response%__HTTP_STATUS:*}"
-  # If body is valid JSON, output it; otherwise wrap the plain text as a JSON error
+  http_status="${http_status//[!0-9]/}"
+  : "${http_status:=0}"
   if echo "$body" | jq '.' >/dev/null 2>&1; then
     echo "$body"
   else
-    jq -n --arg msg "$body" --arg code "$http_status" '{error: $msg, http_status: ($code | tonumber)}'
+    jq -n --arg msg "$body" --argjson code "$http_status" '{error: $msg, http_status: $code}' 2>/dev/null \
+      || printf '{"error":"request failed","http_status":%d}\n' "$http_status"
   fi
 }
 
