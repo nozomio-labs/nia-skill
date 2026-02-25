@@ -29,14 +29,14 @@ cmd_list() {
 # ─── status — check indexing progress and metadata for a repo
 cmd_status() {
   if [ -z "$1" ]; then echo "Usage: repos.sh status <owner/repo>"; return 1; fi
-  local rid=$(echo "$1" | sed 's/\//%2F/g')
+  local rid=$(resolve_source_id "$1" repository)
   nia_get "$BASE_URL/sources/${rid}?type=repository"
 }
 
 # ─── read — read a single file's content from an indexed repo
 cmd_read() {
   if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: repos.sh read <owner/repo> <path/to/file>"; return 1; fi
-  local rid=$(echo "$1" | sed 's/\//%2F/g') fp=$(echo "$2" | sed 's/\//%2F/g')
+  local rid=$(resolve_source_id "$1" repository) fp=$(echo "$2" | sed 's/\//%2F/g')
   nia_get_raw "$BASE_URL/sources/${rid}/content?type=repository&path=${fp}" | jq -r '.content // .'
 }
 
@@ -48,9 +48,8 @@ cmd_grep() {
     echo "       HIGHLIGHT, EXHAUSTIVE, LINES_AFTER, LINES_BEFORE, MAX_PER_FILE, MAX_TOTAL"
     return 1
   fi
-  local rid=$(echo "$1" | sed 's/\//%2F/g')
+  local rid=$(resolve_source_id "$1" repository)
   DATA=$(build_grep_json "$2" "${3:-}")
-  # Add ref if provided
   if [ -n "${REF:-}" ]; then
     DATA=$(echo "$DATA" | jq --arg ref "$REF" '. + {ref: $ref}')
   fi
@@ -64,7 +63,7 @@ cmd_tree() {
     echo "  Env: INCLUDE_PATHS, EXCLUDE_PATHS, FILE_EXTENSIONS, EXCLUDE_EXTENSIONS, SHOW_FULL_PATHS"
     return 1
   fi
-  local rid=$(echo "$1" | sed 's/\//%2F/g') branch="${2:-}"
+  local rid=$(resolve_source_id "$1" repository) branch="${2:-}"
   local params=""
   if [ -n "$branch" ]; then params="${params}&branch=${branch}"; fi
   if [ -n "${INCLUDE_PATHS:-}" ]; then params="${params}&include_paths=${INCLUDE_PATHS}"; fi
@@ -79,14 +78,14 @@ cmd_tree() {
 # ─── delete — remove an indexed repo and all its data
 cmd_delete() {
   if [ -z "$1" ]; then echo "Usage: repos.sh delete <owner/repo>"; return 1; fi
-  local rid=$(echo "$1" | sed 's/\//%2F/g')
+  local rid=$(resolve_source_id "$1" repository)
   nia_delete "$BASE_URL/sources/${rid}?type=repository"
 }
 
 # ─── rename — change the display name of an indexed repo
 cmd_rename() {
   if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: repos.sh rename <owner/repo> <new_name>"; return 1; fi
-  local rid=$(echo "$1" | sed 's/\//%2F/g')
+  local rid=$(resolve_source_id "$1" repository)
   DATA=$(jq -n --arg name "$2" '{display_name: $name}')
   nia_patch "$BASE_URL/sources/${rid}?type=repository" "$DATA"
 }

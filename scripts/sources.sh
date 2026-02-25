@@ -76,7 +76,7 @@ cmd_list() {
 # ─── get — fetch full details for a single source by ID
 cmd_get() {
   if [ -z "$1" ]; then echo "Usage: sources.sh get <source_id> [type]"; return 1; fi
-  local sid=$(urlencode "$1") type="${2:-}"
+  local sid=$(resolve_source_id "$1" "${2:-}") type="${2:-}"
   local url="$BASE_URL/sources/${sid}"
   if [ -n "$type" ]; then url="${url}?type=${type}"; fi
   nia_get "$url"
@@ -94,7 +94,7 @@ cmd_resolve() {
 # ─── update — change a source's display name or category assignment
 cmd_update() {
   if [ -z "$1" ]; then echo "Usage: sources.sh update <source_id> [display_name] [category_id]"; return 1; fi
-  local sid=$(urlencode "$1") dname="${2:-}" cat_id="${3:-}"
+  local sid=$(resolve_source_id "$1") dname="${2:-}" cat_id="${3:-}"
   DATA=$(jq -n --arg dn "$dname" --arg cat "$cat_id" \
     '{} + (if $dn != "" then {display_name: $dn} else {} end)
        + (if $cat == "null" then {category_id: null} elif $cat != "" then {category_id: $cat} else {} end)')
@@ -106,7 +106,7 @@ cmd_update() {
 # ─── delete — remove a source and all its indexed content
 cmd_delete() {
   if [ -z "$1" ]; then echo "Usage: sources.sh delete <source_id> [type]"; return 1; fi
-  local sid=$(urlencode "$1") type="${2:-}"
+  local sid=$(resolve_source_id "$1" "${2:-}") type="${2:-}"
   local url="$BASE_URL/sources/${sid}"
   if [ -n "$type" ]; then url="${url}?type=${type}"; fi
   nia_delete "$url"
@@ -115,7 +115,7 @@ cmd_delete() {
 # ─── sync — re-index a source to pick up upstream changes
 cmd_sync() {
   if [ -z "$1" ]; then echo "Usage: sources.sh sync <source_id> [type]"; return 1; fi
-  local sid=$(urlencode "$1") type="${2:-}"
+  local sid=$(resolve_source_id "$1" "${2:-}") type="${2:-}"
   local url="$BASE_URL/sources/${sid}/sync"
   if [ -n "$type" ]; then url="${url}?type=${type}"; fi
   nia_post "$url" "{}"
@@ -124,7 +124,7 @@ cmd_sync() {
 # ─── rename — change the display name of any source
 cmd_rename() {
   if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: sources.sh rename <source_id> <new_name>"; return 1; fi
-  local sid=$(urlencode "$1")
+  local sid=$(resolve_source_id "$1")
   DATA=$(jq -n --arg name "$2" '{display_name: $name}')
   nia_patch "$BASE_URL/sources/${sid}" "$DATA"
 }
@@ -148,7 +148,7 @@ cmd_read() {
     echo "  MAX_LENGTH  Max characters to return (100-100000)"
     return 1
   fi
-  local sid=$(urlencode "$1") path=$(echo "$2" | sed 's/ /%20/g')
+  local sid=$(resolve_source_id "$1") path=$(echo "$2" | sed 's/ /%20/g')
   local url="$BASE_URL/sources/${sid}/content?path=${path}"
   if [ -n "${3:-}" ]; then url="${url}&line_start=$3"; fi
   if [ -n "${4:-}" ]; then url="${url}&line_end=$4"; fi
@@ -164,7 +164,7 @@ cmd_grep() {
     echo "       HIGHLIGHT, EXHAUSTIVE, LINES_AFTER, LINES_BEFORE, MAX_PER_FILE, MAX_TOTAL"
     return 1
   fi
-  local sid=$(urlencode "$1")
+  local sid=$(resolve_source_id "$1")
   DATA=$(build_grep_json "$2" "${3:-}")
   nia_post "$BASE_URL/sources/${sid}/grep" "$DATA"
 }
@@ -172,21 +172,21 @@ cmd_grep() {
 # ─── tree — print the full file tree of a source
 cmd_tree() {
   if [ -z "$1" ]; then echo "Usage: sources.sh tree <source_id>"; return 1; fi
-  local sid=$(urlencode "$1")
+  local sid=$(resolve_source_id "$1")
   nia_get_raw "$BASE_URL/sources/${sid}/tree" | jq '.tree_string // .'
 }
 
 # ─── ls — list files/dirs in a specific path within a source
 cmd_ls() {
   if [ -z "$1" ]; then echo "Usage: sources.sh ls <source_id> [path]"; return 1; fi
-  local sid=$(echo "$1" | jq -Rr @uri) dir=$(echo "${2:-/}" | jq -Rr @uri)
+  local sid=$(resolve_source_id "$1") dir=$(echo "${2:-/}" | jq -Rr @uri)
   nia_get "$BASE_URL/sources/${sid}/tree?path=${dir}"
 }
 
 # ─── classification — get or update the auto-classification for a source
 cmd_classification() {
   if [ -z "$1" ]; then echo "Usage: sources.sh classification <source_id> [type]"; return 1; fi
-  local sid=$(urlencode "$1") type="${2:-}"
+  local sid=$(resolve_source_id "$1" "${2:-}") type="${2:-}"
   local url="$BASE_URL/sources/${sid}/classification"
   if [ -n "$type" ]; then url="${url}?type=${type}"; fi
   if [ "${ACTION:-}" = "update" ]; then
@@ -199,7 +199,7 @@ cmd_classification() {
 # ─── assign-category — assign (or remove with 'null') a category for a source
 cmd_assign_category() {
   if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: sources.sh assign-category <source_id> <category_id|null>"; return 1; fi
-  local sid=$(urlencode "$1") cat_id="$2"
+  local sid=$(resolve_source_id "$1") cat_id="$2"
   if [ "$cat_id" = "null" ]; then
     DATA='{"category_id": null}'
   else

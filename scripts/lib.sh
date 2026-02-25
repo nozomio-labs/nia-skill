@@ -64,6 +64,28 @@ nia_upload() {
   curl "${args[@]}" | jq '.'
 }
 
+# Resolve a human-friendly identifier (owner/repo, URL, display name) to a source ID.
+# Returns the resolved ID, or the original value if it's already a UUID/ObjectId.
+resolve_source_id() {
+  local identifier="$1" type="${2:-}"
+  if [[ "$identifier" =~ ^[0-9a-fA-F]{24}$ ]] || [[ "$identifier" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+    echo "$identifier"
+    return 0
+  fi
+  local encoded=$(urlencode "$identifier")
+  local url="$BASE_URL/sources/resolve?identifier=${encoded}"
+  if [ -n "$type" ]; then url="${url}&type=${type}"; fi
+  local result
+  result=$(nia_curl GET "$url")
+  local resolved_id=$(echo "$result" | jq -r '.id // empty' 2>/dev/null)
+  if [ -n "$resolved_id" ]; then
+    echo "$resolved_id"
+    return 0
+  fi
+  echo "$identifier"
+  return 1
+}
+
 # Helper: build grep JSON body with all common options
 build_grep_json() {
   local pattern="$1" path_prefix="${2:-}"
