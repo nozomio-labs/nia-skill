@@ -3,6 +3,8 @@
 # Source this file: source "$(dirname "$0")/lib.sh"
 
 BASE_URL="https://apigcp.trynia.ai/v2"
+NIA_CONNECT_TIMEOUT_SECONDS="${NIA_CONNECT_TIMEOUT_SECONDS:-10}"
+NIA_TIMEOUT_SECONDS="${NIA_TIMEOUT_SECONDS:-90}"
 
 nia_auth() {
   if [ -n "${NIA_API_KEY:-}" ]; then
@@ -21,16 +23,84 @@ urlencode() {
   echo "$1" | sed 's/ /%20/g; s/\//%2F/g'
 }
 
+nia_trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+nia_is_source_id() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9a-fA-F]{24}$ ]] || [[ "$value" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
+}
+
+nia_source_status_label() {
+  local source_json="$1"
+  echo "$source_json" | jq -r '
+    if (.status // empty) != "" then .status
+    elif (.index_status // empty) != "" then .index_status
+    elif (.metadata.index_status // empty) != "" then .metadata.index_status
+    elif (.metadata.status // empty) != "" then .metadata.status
+    elif (.is_indexed == true or .metadata.is_indexed == true) then "indexed"
+    elif (.is_indexed == false or .metadata.is_indexed == false) then "not_indexed"
+    else "unknown"
+    end
+  ' 2>/dev/null
+}
+
+nia_source_is_ready() {
+  local source_json="$1"
+  local explicit indexed_status
+  explicit=$(echo "$source_json" | jq -r '
+    if (.is_indexed == true or .metadata.is_indexed == true) then "true"
+    elif (.is_indexed == false or .metadata.is_indexed == false) then "false"
+    else ""
+    end
+  ' 2>/dev/null)
+  if [ "$explicit" = "true" ]; then
+    return 0
+  fi
+  indexed_status=$(echo "$source_json" | jq -r '(.status // .index_status // .metadata.index_status // .metadata.status // "") | tostring | ascii_downcase' 2>/dev/null)
+  case "$indexed_status" in
+    ""|indexed|ready|complete|completed|synced|success|active)
+      [ "$explicit" = "false" ] && return 1
+      return 0
+      ;;
+    indexing|processing|pending|queued|in_progress|running|syncing|building|not_indexed|failed|error|deleted|deleting)
+      return 1
+      ;;
+    *)
+      [ "$explicit" = "false" ] && return 1
+      return 0
+      ;;
+  esac
+}
+
 # Generic curl wrapper: nia_curl METHOD URL [DATA]
 # Captures HTTP status code and returns JSON. Non-JSON errors (e.g. rate limits) are wrapped.
 nia_curl() {
   local method="$1" url="$2" data="${3:-}"
-  local args=(-s -w '\n__HTTP_STATUS:%{http_code}' -X "$method" "$url" -H "Authorization: Bearer $NIA_KEY")
+  local args=(-s --connect-timeout "$NIA_CONNECT_TIMEOUT_SECONDS" --max-time "$NIA_TIMEOUT_SECONDS" -w '\n__HTTP_STATUS:%{http_code}' -X "$method" "$url" -H "Authorization: Bearer $NIA_KEY")
   if [ -n "$data" ]; then
     args+=(-H "Content-Type: application/json" -d "$data")
   fi
-  local response
-  response=$(curl "${args[@]}" 2>/dev/null) || true
+  local response curl_exit
+  set +e
+  response=$(curl "${args[@]}" 2>/dev/null)
+  curl_exit=$?
+  set -e
+  if [ "$curl_exit" -ne 0 ]; then
+    local msg
+    case "$curl_exit" in
+      28) msg="Request timed out after ${NIA_TIMEOUT_SECONDS}s. Increase NIA_TIMEOUT_SECONDS if needed." ;;
+      7) msg="Failed to connect to Nia API. Check network access and BASE_URL." ;;
+      *) msg="Request failed with curl exit code ${curl_exit}." ;;
+    esac
+    jq -n --arg msg "$msg" --argjson code 0 --argjson cexit "$curl_exit" '{error: $msg, http_status: $code, curl_exit: $cexit}' 2>/dev/null \
+      || printf '{"error":"request failed","http_status":0,"curl_exit":%d}\n' "$curl_exit"
+    return 0
+  fi
   local http_status="${response##*__HTTP_STATUS:}"
   local body="${response%__HTTP_STATUS:*}"
   http_status="${http_status//[!0-9]/}"

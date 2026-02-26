@@ -67,6 +67,7 @@ echo "your-api-key-here" > ~/.config/nia/api_key
 - For docs, always index the root link (e.g., docs.stripe.com) to scrape all pages.
 - Indexing takes 1-5 minutes. Wait, then run list again to check status.
 - All scripts use environment variables for optional parameters (e.g. `EXTRACT_BRANDING=true`).
+- API calls default to `NIA_TIMEOUT_SECONDS=90` and `NIA_CONNECT_TIMEOUT_SECONDS=10` to avoid indefinite hangs.
 
 ## Scripts
 
@@ -117,6 +118,7 @@ Run any script without arguments to see available commands and usage.
 ./scripts/repos.sh tree <owner/repo> [branch]                    # Get file tree
 ./scripts/repos.sh delete <repo_id>                              # Delete repo
 ./scripts/repos.sh rename <repo_id> <new_name>                   # Rename display name
+./scripts/repos.sh sync <owner/repo>                             # Re-index repo source
 ```
 
 **Tree environment variables**: `INCLUDE_PATHS`, `EXCLUDE_PATHS`, `FILE_EXTENSIONS`, `EXCLUDE_EXTENSIONS`, `SHOW_FULL_PATHS`
@@ -130,7 +132,8 @@ Run any script without arguments to see available commands and usage.
 ./scripts/search.sh deep <query> [output_format]                 # Deep research (Pro)
 ```
 
-**query** — targeted search with AI response and sources. Env: `LOCAL_FOLDERS`, `SLACK_WORKSPACES`, `CATEGORY`, `MAX_TOKENS`, `FAST_MODE`, `SKIP_LLM`, `REASONING_STRATEGY` (vector|tree|hybrid), `MODEL`, `BYPASS_CACHE`, `INCLUDE_FOLLOW_UPS`. Slack filters: `SLACK_CHANNELS`, `SLACK_USERS`, `SLACK_DATE_FROM`, `SLACK_DATE_TO`, `SLACK_INCLUDE_THREADS`. **This is the only search command that supports Slack.**
+**query** — targeted search with AI response and sources. Env: `LOCAL_FOLDERS`, `SLACK_WORKSPACES`, `CATEGORY`, `MAX_TOKENS`, `FAST_MODE`, `SKIP_LLM`, `REASONING_STRATEGY` (vector|tree|hybrid), `MODEL`, `BYPASS_CACHE`, `INCLUDE_FOLLOW_UPS`, `RESOLVE_SOURCE_IDS`, `REQUIRE_INDEXED_REPOS`. Slack filters: `SLACK_CHANNELS`, `SLACK_USERS`, `SLACK_DATE_FROM`, `SLACK_DATE_TO`, `SLACK_INCLUDE_THREADS`. **This is the only search command that supports Slack.**
+By default query resolves identifiers to source IDs and skips repositories that are not yet indexed; set `REQUIRE_INDEXED_REPOS=false` to include them anyway.
 **universal** — hybrid vector + BM25 across all indexed public sources (repos + docs + HF datasets). **Does NOT include Slack.** Env: `INCLUDE_REPOS`, `INCLUDE_DOCS`, `INCLUDE_HF`, `ALPHA`, `COMPRESS`, `MAX_TOKENS`, `BOOST_LANGUAGES`, `EXPAND_SYMBOLS`
 **web** — web search. Env: `CATEGORY` (github|company|research|news|tweet|pdf|blog), `DAYS_BACK`, `FIND_SIMILAR_TO`
 **deep** — deep AI research (Pro). Env: `VERBOSE`

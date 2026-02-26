@@ -38,6 +38,9 @@ Nia provides tools for indexing and searching external repositories, research pa
 # List indexed repositories
 ./scripts/repos.sh list
 
+# Re-index a repository source
+./scripts/repos.sh sync "owner/repo"
+
 # Search all indexed sources
 ./scripts/search.sh universal "how does auth work?"
 

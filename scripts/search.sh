@@ -5,30 +5,99 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
+csv_to_json_array() {
+  local csv="${1:-}" result="[]"
+  while IFS= read -r raw; do
+    local item
+    item=$(nia_trim "$raw")
+    [ -z "$item" ] && continue
+    result=$(echo "$result" | jq --arg item "$item" '. + [$item]')
+  done < <(printf '%s\n' "$csv" | tr ',' '\n')
+  echo "$result"
+}
+
+resolve_query_repositories() {
+  local repos_csv="${1:-}" result="[]"
+  local resolve_ids="${RESOLVE_SOURCE_IDS:-true}" require_ready="${REQUIRE_INDEXED_REPOS:-true}"
+  local -a skipped_repos=()
+  while IFS= read -r raw; do
+    local repo target resolved source_json source_status
+    repo=$(nia_trim "$raw")
+    [ -z "$repo" ] && continue
+    target="$repo"
+    if [ "$resolve_ids" = "true" ]; then
+      resolved=$(resolve_source_id "$repo" repository || true)
+      if [ -n "$resolved" ]; then target="$resolved"; fi
+    fi
+    if [ "$require_ready" = "true" ] && nia_is_source_id "$target"; then
+      source_json=$(nia_curl GET "$BASE_URL/sources/${target}?type=repository")
+      if echo "$source_json" | jq -e '.error?' >/dev/null 2>&1; then
+        echo "Warning: Could not verify indexing status for repository '$repo'; continuing." >&2
+      elif ! nia_source_is_ready "$source_json"; then
+        source_status=$(nia_source_status_label "$source_json")
+        skipped_repos+=("$repo (${source_status:-unknown})")
+        continue
+      fi
+    fi
+    result=$(echo "$result" | jq --arg item "$target" '. + [$item]')
+  done < <(printf '%s\n' "$repos_csv" | tr ',' '\n')
+  if [ "${#skipped_repos[@]}" -gt 0 ]; then
+    echo "Warning: Skipping repositories not ready for semantic search: ${skipped_repos[*]}" >&2
+  fi
+  echo "$result"
+}
+
+resolve_query_sources() {
+  local sources_csv="${1:-}" result="[]"
+  local resolve_ids="${RESOLVE_SOURCE_IDS:-true}"
+  while IFS= read -r raw; do
+    local source target resolved
+    source=$(nia_trim "$raw")
+    [ -z "$source" ] && continue
+    target="$source"
+    if [ "$resolve_ids" = "true" ]; then
+      resolved=$(resolve_source_id "$source" || true)
+      if [ -n "$resolved" ]; then target="$resolved"; fi
+    fi
+    result=$(echo "$result" | jq --arg item "$target" '. + [$item]')
+  done < <(printf '%s\n' "$sources_csv" | tr ',' '\n')
+  echo "$result"
+}
+
 # ─── query — AI-powered search across specific repos, docs, or local folders
 cmd_query() {
   if [ -z "$1" ]; then
     echo "Usage: search.sh query <query> <repos_csv> [docs_csv]"
     echo "  Env: LOCAL_FOLDERS, SLACK_WORKSPACES, CATEGORY, MAX_TOKENS,"
     echo "       FAST_MODE, SKIP_LLM, REASONING_STRATEGY, MODEL,"
-    echo "       BYPASS_CACHE, INCLUDE_FOLLOW_UPS"
+    echo "       BYPASS_CACHE, INCLUDE_FOLLOW_UPS, RESOLVE_SOURCE_IDS,"
+    echo "       REQUIRE_INDEXED_REPOS"
     echo "  Slack filter env: SLACK_CHANNELS, SLACK_USERS, SLACK_DATE_FROM,"
     echo "       SLACK_DATE_TO, SLACK_INCLUDE_THREADS"
     return 1
   fi
   local query="$1" repos="${2:-}" docs="${3:-}"
   if [ -n "$repos" ]; then
-    REPOS_JSON=$(echo "$repos" | tr ',' '\n' | jq -R '.' | jq -s 'map({repository: .})')
+    REPOS_JSON=$(resolve_query_repositories "$repos")
   else REPOS_JSON="[]"; fi
   if [ -n "$docs" ]; then
-    DOCS_JSON=$(echo "$docs" | tr ',' '\n' | jq -R '.' | jq -s '.')
+    DOCS_JSON=$(resolve_query_sources "$docs")
   else DOCS_JSON="[]"; fi
   if [ -n "${LOCAL_FOLDERS:-}" ]; then
-    FOLDERS_JSON=$(echo "$LOCAL_FOLDERS" | tr ',' '\n' | jq -R '.' | jq -s '.')
+    FOLDERS_JSON=$(csv_to_json_array "$LOCAL_FOLDERS")
   else FOLDERS_JSON="[]"; fi
   if [ -n "${SLACK_WORKSPACES:-}" ]; then
-    SLACK_JSON=$(echo "$SLACK_WORKSPACES" | tr ',' '\n' | jq -R '.' | jq -s '.')
+    SLACK_JSON=$(csv_to_json_array "$SLACK_WORKSPACES")
   else SLACK_JSON="[]"; fi
+  local repos_len docs_len folders_len slack_len
+  repos_len=$(echo "$REPOS_JSON" | jq 'length')
+  docs_len=$(echo "$DOCS_JSON" | jq 'length')
+  folders_len=$(echo "$FOLDERS_JSON" | jq 'length')
+  slack_len=$(echo "$SLACK_JSON" | jq 'length')
+  if [ "$repos_len" -eq 0 ] && [ "$docs_len" -eq 0 ] && [ "$folders_len" -eq 0 ] && [ "$slack_len" -eq 0 ]; then
+    jq -n --arg msg "No query targets are ready. Wait for indexing to finish or disable REQUIRE_INDEXED_REPOS." '{error: $msg}'
+    return 1
+  fi
   # Build slack_filters if any slack filter env is set
   SLACK_FILTERS="null"
   if [ -n "${SLACK_CHANNELS:-}${SLACK_USERS:-}${SLACK_DATE_FROM:-}${SLACK_DATE_TO:-}${SLACK_INCLUDE_THREADS:-}" ]; then
@@ -44,8 +113,8 @@ cmd_query() {
       + (if $it != "" then {include_threads: ($it == "true")} else {} end)')
   fi
   # Auto-detect search mode
-  if [ -n "$repos" ] && [ -z "$docs" ]; then MODE="repositories"
-  elif [ -z "$repos" ] && [ -n "$docs" ]; then MODE="sources"
+  if [ "$repos_len" -gt 0 ] && [ "$docs_len" -eq 0 ]; then MODE="repositories"
+  elif [ "$repos_len" -eq 0 ] && [ "$docs_len" -gt 0 ]; then MODE="sources"
   else MODE="unified"; fi
   DATA=$(jq -n \
     --arg q "$query" --arg mode "$MODE" \
