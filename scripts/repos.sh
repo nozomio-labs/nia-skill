@@ -90,6 +90,13 @@ cmd_rename() {
   nia_patch "$BASE_URL/sources/${rid}?type=repository" "$DATA"
 }
 
+# ─── sync — re-index an existing repository source
+cmd_sync() {
+  if [ -z "$1" ]; then echo "Usage: repos.sh sync <owner/repo>"; return 1; fi
+  local rid=$(resolve_source_id "$1" repository)
+  nia_post "$BASE_URL/sources/${rid}/sync?type=repository" "{}"
+}
+
 # ─── dispatch ─────────────────────────────────────────────────────────────────
 case "${1:-}" in
   index)   shift; cmd_index "$@" ;;
@@ -100,6 +107,7 @@ case "${1:-}" in
   tree)    shift; cmd_tree "$@" ;;
   delete)  shift; cmd_delete "$@" ;;
   rename)  shift; cmd_rename "$@" ;;
+  sync)    shift; cmd_sync "$@" ;;
   *)
     echo "Usage: $(basename "$0") <command> [args...]"
     echo ""
@@ -112,6 +120,7 @@ case "${1:-}" in
     echo "  tree     Get repository file tree"
     echo "  delete   Delete indexed repository"
     echo "  rename   Rename repository display name"
+    echo "  sync     Re-index repository source"
     exit 1
     ;;
 esac
