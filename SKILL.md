@@ -158,19 +158,19 @@ Run any script without arguments to see available commands and usage.
 Autonomous agent for searching GitHub repositories without indexing. Powered by Claude Opus 4.6 with 1M context.
 
 ```bash
-./scripts/tracer.sh run <query> [repos_csv] [context]            # Create Tracer job
+./scripts/tracer.sh run <query> [repos_csv] [context] [mode]     # Create Tracer job
 ./scripts/tracer.sh status <job_id>                              # Get job status/result
 ./scripts/tracer.sh stream <job_id>                              # Stream real-time updates (SSE)
 ./scripts/tracer.sh list [status] [limit]                        # List jobs
 ./scripts/tracer.sh delete <job_id>                              # Delete job
 ```
 
-**Environment variables**: `MODEL` (claude-opus-4-6|claude-opus-4-6-1m)
+**Environment variables**: `MODEL` (claude-haiku-4-5-20251001|claude-opus-4-6|claude-opus-4-6-1m), `TRACER_MODE` (fast|slow)
 
 **Example workflow:**
 ```bash
 # 1. Start a search
-./scripts/tracer.sh run "How does streaming work in generateText?" vercel/ai "Focus on core implementation"
+./scripts/tracer.sh run "How does streaming work in generateText?" vercel/ai "Focus on core implementation" slow
 # Returns: {"job_id": "abc123", "session_id": "def456", "status": "queued"}
 
 # 2. Stream progress
