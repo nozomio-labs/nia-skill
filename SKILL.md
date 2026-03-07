@@ -93,11 +93,11 @@ Run any script without arguments to see available commands and usage.
 ./scripts/sources.sh ls <source_id> [path]                        # List directory
 ./scripts/sources.sh classification <source_id> [type]            # Get classification
 ./scripts/sources.sh assign-category <source_id> <cat_id|null>    # Assign category
-./scripts/sources.sh upload-url <filename>                        # Get signed URL for PDF upload
+./scripts/sources.sh upload-url <filename>                        # Get signed URL for file upload (PDF, CSV, TSV, XLSX, XLS)
 ./scripts/sources.sh bulk-delete <id:type> [id:type ...]          # Bulk delete resources
 ```
 
-**Index environment variables**: `DISPLAY_NAME`, `FOCUS`, `EXTRACT_BRANDING`, `EXTRACT_IMAGES`, `IS_PDF`, `URL_PATTERNS`, `EXCLUDE_PATTERNS`, `MAX_DEPTH`, `WAIT_FOR`, `CHECK_LLMS_TXT`, `LLMS_TXT_STRATEGY`, `INCLUDE_SCREENSHOT`, `ONLY_MAIN_CONTENT`, `ADD_GLOBAL`, `MAX_AGE`
+**Index environment variables**: `DISPLAY_NAME`, `FOCUS`, `EXTRACT_BRANDING`, `EXTRACT_IMAGES`, `IS_PDF`, `IS_SPREADSHEET`, `URL_PATTERNS`, `EXCLUDE_PATTERNS`, `MAX_DEPTH`, `WAIT_FOR`, `CHECK_LLMS_TXT`, `LLMS_TXT_STRATEGY`, `INCLUDE_SCREENSHOT`, `ONLY_MAIN_CONTENT`, `ADD_GLOBAL`, `MAX_AGE`
 
 **Grep environment variables**: `CASE_SENSITIVE`, `WHOLE_WORD`, `FIXED_STRING`, `OUTPUT_MODE`, `HIGHLIGHT`, `EXHAUSTIVE`, `LINES_AFTER`, `LINES_BEFORE`, `MAX_PER_FILE`, `MAX_TOTAL`
 
@@ -155,7 +155,7 @@ Run any script without arguments to see available commands and usage.
 
 ### tracer.sh — Tracer GitHub Code Search (Pro)
 
-Autonomous agent for searching GitHub repositories without indexing. Powered by Claude Opus 4.6 with 1M context.
+Autonomous agent for searching GitHub repositories without indexing. Delegates to specialized sub-agents for faster, more thorough results. Supports fast mode (Haiku) and deep mode (Opus with 1M context).
 
 ```bash
 ./scripts/tracer.sh run <query> [repos_csv] [context] [mode]     # Create Tracer job

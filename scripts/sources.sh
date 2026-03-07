@@ -16,6 +16,7 @@ cmd_index() {
     echo "  EXTRACT_BRANDING      Extract brand colors, logos, fonts (true/false)"
     echo "  EXTRACT_IMAGES        Extract all image URLs (true/false)"
     echo "  IS_PDF                Direct PDF URL (true/false)"
+    echo "  IS_SPREADSHEET        Spreadsheet file - CSV, TSV, XLSX, XLS (true/false)"
     echo "  URL_PATTERNS          Comma-separated include patterns"
     echo "  EXCLUDE_PATTERNS      Comma-separated exclude patterns"
     echo "  MAX_DEPTH             Maximum crawl depth (default: 20)"
@@ -37,6 +38,7 @@ cmd_index() {
     --arg extract_branding "${EXTRACT_BRANDING:-}" \
     --arg extract_images "${EXTRACT_IMAGES:-}" \
     --arg is_pdf "${IS_PDF:-}" \
+    --arg is_spreadsheet "${IS_SPREADSHEET:-}" \
     --arg url_patterns "${URL_PATTERNS:-}" \
     --arg exclude_patterns "${EXCLUDE_PATTERNS:-}" \
     --arg max_depth "${MAX_DEPTH:-}" \
@@ -53,6 +55,7 @@ cmd_index() {
     + (if $extract_branding != "" then {extract_branding: ($extract_branding == "true")} else {} end)
     + (if $extract_images != "" then {extract_images: ($extract_images == "true")} else {} end)
     + (if $is_pdf != "" then {is_pdf: ($is_pdf == "true")} else {} end)
+    + (if $is_spreadsheet != "" then {is_spreadsheet: ($is_spreadsheet == "true")} else {} end)
     + (if $url_patterns != "" then {url_patterns: ($url_patterns | split(","))} else {} end)
     + (if $exclude_patterns != "" then {exclude_patterns: ($exclude_patterns | split(","))} else {} end)
     + (if $max_depth != "" then {max_depth: ($max_depth | tonumber)} else {} end)
@@ -208,14 +211,23 @@ cmd_assign_category() {
   nia_patch "$BASE_URL/sources/${sid}" "$DATA"
 }
 
-# ─── upload-url — get a signed URL for direct PDF upload
+# ─── upload-url — get a signed URL for file upload (PDF, spreadsheets)
 cmd_upload_url() {
   if [ -z "$1" ]; then
     echo "Usage: sources.sh upload-url <filename>"
     echo "  Returns signed URL for HTTP PUT upload and gcs_path for create-source"
+    echo "  Supports: PDF, CSV, TSV, XLSX, XLS"
     return 1
   fi
-  DATA=$(jq -n --arg fn "$1" '{filename: $fn, content_type: "application/pdf"}')
+  local filename="$1"
+  local content_type="application/pdf"
+  case "${filename##*.}" in
+    csv)  content_type="text/csv" ;;
+    tsv)  content_type="text/tab-separated-values" ;;
+    xlsx) content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ;;
+    xls)  content_type="application/vnd.ms-excel" ;;
+  esac
+  DATA=$(jq -n --arg fn "$filename" --arg ct "$content_type" '{filename: $fn, content_type: $ct}')
   nia_post "$BASE_URL/sources/upload-url" "$DATA"
 }
 
@@ -274,7 +286,7 @@ case "${1:-}" in
     echo "  ls               List directory in source"
     echo "  classification   Get/update source classification"
     echo "  assign-category  Assign category to source"
-    echo "  upload-url       Get signed URL for PDF upload"
+    echo "  upload-url       Get signed URL for file upload (PDF, CSV, TSV, XLSX, XLS)"
     echo "  bulk-delete      Delete multiple resources at once"
     exit 1
     ;;
