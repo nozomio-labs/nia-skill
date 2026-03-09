@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Nia Packages — search package source code
 # Usage: packages.sh <command> [args...]
-# Registry: npm | py_pi | crates_io | golang_proxy
+# Registry: npm | py_pi | crates_io | golang_proxy | ruby_gems
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
@@ -10,7 +10,7 @@ source "$SCRIPT_DIR/lib.sh"
 cmd_grep() {
   if [ -z "$3" ]; then
     echo "Usage: packages.sh grep <registry> <package> <pattern> [version]"
-    echo "  registry: npm | py_pi | crates_io | golang_proxy"
+    echo "  registry: npm | py_pi | crates_io | golang_proxy | ruby_gems"
     echo "  Env: LANGUAGE, CONTEXT_BEFORE, CONTEXT_AFTER, CONTEXT_LINES, OUTPUT_MODE, HEAD_LIMIT, FILE_SHA256"
     return 1
   fi
@@ -33,7 +33,7 @@ cmd_grep() {
 cmd_hybrid() {
   if [ -z "$3" ]; then
     echo "Usage: packages.sh hybrid <registry> <package> <query> [version]"
-    echo "  registry: npm | py_pi | crates_io | golang_proxy"
+    echo "  registry: npm | py_pi | crates_io | golang_proxy | ruby_gems"
     echo "  Env: PATTERN (regex pre-filter), LANGUAGE, FILE_SHA256"
     return 1
   fi

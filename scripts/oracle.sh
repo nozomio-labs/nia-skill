@@ -45,6 +45,12 @@ cmd_job_status() {
   nia_get "$BASE_URL/oracle/jobs/$1"
 }
 
+# ─── job-stream — stream real-time updates from a running job (SSE)
+cmd_job_stream() {
+  if [ -z "$1" ]; then echo "Usage: oracle.sh job-stream <job_id>"; return 1; fi
+  curl -s -N "$BASE_URL/oracle/jobs/$1/stream" -H "Authorization: Bearer $NIA_KEY"
+}
+
 # ─── job-cancel — cancel a running async research job
 cmd_job_cancel() {
   if [ -z "$1" ]; then echo "Usage: oracle.sh job-cancel <job_id>"; return 1; fi
@@ -100,6 +106,7 @@ case "${1:-}" in
   run)              shift; cmd_run "$@" ;;
   job)              shift; cmd_job "$@" ;;
   job-status)       shift; cmd_job_status "$@" ;;
+  job-stream)       shift; cmd_job_stream "$@" ;;
   job-cancel)       shift; cmd_job_cancel "$@" ;;
   jobs-list)        shift; cmd_jobs_list "$@" ;;
   sessions)         shift; cmd_sessions "$@" ;;
@@ -115,6 +122,7 @@ case "${1:-}" in
     echo "  run              Run Oracle research (synchronous)"
     echo "  job              Create async research job"
     echo "  job-status       Get job status/result"
+    echo "  job-stream       Stream live job updates (SSE)"
     echo "  job-cancel       Cancel a running job"
     echo "  jobs-list        List jobs [status] [limit]"
     echo "  sessions         List research sessions"

@@ -40,10 +40,12 @@ cmd_delete() {
 # ─── assign — assign a category to a source, or pass 'null' to remove it
 cmd_assign() {
   if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: categories.sh assign <source_id> <category_id|null>"; return 1; fi
-  local sid=$(urlencode "$1") cat_id="$2"
+  local sid=$(resolve_source_id "$1" "${TYPE:-}") cat_id="$2"
   if [ "$cat_id" = "null" ]; then DATA='{"category_id": null}'
   else DATA=$(jq -n --arg c "$cat_id" '{category_id: $c}'); fi
-  nia_patch "$BASE_URL/data-sources/${sid}/category" "$DATA"
+  local url="$BASE_URL/sources/${sid}"
+  if [ -n "${TYPE:-}" ]; then url="${url}?type=${TYPE}"; fi
+  nia_patch "$url" "$DATA"
 }
 
 # ─── dispatch ─────────────────────────────────────────────────────────────────

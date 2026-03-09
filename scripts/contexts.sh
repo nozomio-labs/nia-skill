@@ -9,17 +9,25 @@ source "$SCRIPT_DIR/lib.sh"
 cmd_save() {
   if [ -z "$4" ]; then
     echo "Usage: contexts.sh save <title> <summary> <content> <agent_source>"
-    echo "  Env: TAGS (csv), MEMORY_TYPE (scratchpad|episodic|fact|procedural), TTL_SECONDS, WORKSPACE"
+    echo "  Env: TAGS, MEMORY_TYPE, TTL_SECONDS, ORGANIZATION_ID,"
+    echo "       METADATA_JSON, NIA_REFERENCES_JSON, EDITED_FILES_JSON, LINEAGE_JSON"
     return 1
   fi
   DATA=$(jq -n \
     --arg title "$1" --arg summary "$2" --arg content "$3" --arg agent "$4" \
-    --arg tags "${TAGS:-}" --arg mt "${MEMORY_TYPE:-}" --arg ttl "${TTL_SECONDS:-}" --arg ws "${WORKSPACE:-}" \
+    --arg tags "${TAGS:-}" --arg mt "${MEMORY_TYPE:-}" --arg ttl "${TTL_SECONDS:-}" \
+    --arg org "${ORGANIZATION_ID:-}" --arg metadata "${METADATA_JSON:-}" \
+    --arg refs "${NIA_REFERENCES_JSON:-}" --arg files "${EDITED_FILES_JSON:-}" \
+    --arg lineage "${LINEAGE_JSON:-}" \
     '{title: $title, summary: $summary, content: $content, agent_source: $agent}
     + (if $tags != "" then {tags: ($tags | split(","))} else {} end)
     + (if $mt != "" then {memory_type: $mt} else {} end)
     + (if $ttl != "" then {ttl_seconds: ($ttl | tonumber)} else {} end)
-    + (if $ws != "" then {workspace_override: $ws} else {} end)')
+    + (if $org != "" then {organization_id: $org} else {} end)
+    + (if $metadata != "" then {metadata: ($metadata | fromjson)} else {} end)
+    + (if $refs != "" then {nia_references: ($refs | fromjson)} else {} end)
+    + (if $files != "" then {edited_files: ($files | fromjson)} else {} end)
+    + (if $lineage != "" then {lineage: ($lineage | fromjson)} else {} end)')
   nia_post "$BASE_URL/contexts" "$DATA"
 }
 
@@ -63,18 +71,27 @@ cmd_get() {
 cmd_update() {
   if [ -z "$1" ]; then
     echo "Usage: contexts.sh update <context_id> [title] [summary] [content]"
-    echo "  Pass '' to skip a field. Env: TAGS, MEMORY_TYPE, TTL_SECONDS"
+    echo "  Pass '' to skip a field. Env: TAGS, MEMORY_TYPE, TTL_SECONDS,"
+    echo "       ORGANIZATION_ID, METADATA_JSON, NIA_REFERENCES_JSON, EDITED_FILES_JSON, LINEAGE_JSON"
     return 1
   fi
   DATA=$(jq -n \
     --arg title "${2:-}" --arg summary "${3:-}" --arg content "${4:-}" \
     --arg tags "${TAGS:-}" --arg mt "${MEMORY_TYPE:-}" --arg ttl "${TTL_SECONDS:-}" \
+    --arg org "${ORGANIZATION_ID:-}" --arg metadata "${METADATA_JSON:-}" \
+    --arg refs "${NIA_REFERENCES_JSON:-}" --arg files "${EDITED_FILES_JSON:-}" \
+    --arg lineage "${LINEAGE_JSON:-}" \
     '{} + (if $title != "" then {title: $title} else {} end)
        + (if $summary != "" then {summary: $summary} else {} end)
        + (if $content != "" then {content: $content} else {} end)
        + (if $tags != "" then {tags: ($tags | split(","))} else {} end)
        + (if $mt != "" then {memory_type: $mt} else {} end)
-       + (if $ttl != "" then {ttl_seconds: ($ttl | tonumber)} else {} end)')
+       + (if $ttl != "" then {ttl_seconds: ($ttl | tonumber)} else {} end)
+       + (if $org != "" then {organization_id: $org} else {} end)
+       + (if $metadata != "" then {metadata: ($metadata | fromjson)} else {} end)
+       + (if $refs != "" then {nia_references: ($refs | fromjson)} else {} end)
+       + (if $files != "" then {edited_files: ($files | fromjson)} else {} end)
+       + (if $lineage != "" then {lineage: ($lineage | fromjson)} else {} end)')
   nia_put "$BASE_URL/contexts/$1" "$DATA"
 }
 

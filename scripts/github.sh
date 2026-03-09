@@ -37,7 +37,7 @@ cmd_search() {
     echo "Usage: github.sh search <owner/repo> <query> [per_page] [page]"
     return 1
   fi
-  DATA=$(jq -n --arg repo "$2" --arg q "$1" \
+  DATA=$(jq -n --arg repo "$1" --arg q "$2" \
     --argjson pp "${3:-30}" --argjson pg "${4:-1}" \
     '{query: $q, repository: $repo, per_page: $pp, page: $pg}')
   nia_post "$BASE_URL/github/search" "$DATA"

@@ -10,10 +10,13 @@ cmd_query() {
   if [ -z "$1" ]; then
     echo "Usage: search.sh query <query> <repos_csv> [docs_csv]"
     echo "  Env: LOCAL_FOLDERS, SLACK_WORKSPACES, CATEGORY, MAX_TOKENS,"
-    echo "       FAST_MODE, SKIP_LLM, REASONING_STRATEGY, MODEL,"
-    echo "       BYPASS_CACHE, INCLUDE_FOLLOW_UPS"
+    echo "       STREAM, INCLUDE_SOURCES, FAST_MODE, SKIP_LLM,"
+    echo "       REASONING_STRATEGY, MODEL, SEARCH_MODE,"
+    echo "       BYPASS_CACHE, SEMANTIC_CACHE_THRESHOLD, INCLUDE_FOLLOW_UPS"
     echo "  Slack filter env: SLACK_CHANNELS, SLACK_USERS, SLACK_DATE_FROM,"
     echo "       SLACK_DATE_TO, SLACK_INCLUDE_THREADS"
+    echo "  Local source filter env: SOURCE_SUBTYPE, DB_TYPE, CONNECTOR_TYPE,"
+    echo "       CONVERSATION_ID, CONTACT_ID, SENDER_ROLE, TIME_AFTER, TIME_BEFORE"
     return 1
   fi
   local query="$1" repos="${2:-}" docs="${3:-}"
@@ -29,6 +32,24 @@ cmd_query() {
   if [ -n "${SLACK_WORKSPACES:-}" ]; then
     SLACK_JSON=$(echo "$SLACK_WORKSPACES" | tr ',' '\n' | jq -R '.' | jq -s '.')
   else SLACK_JSON="[]"; fi
+
+  LOCAL_SOURCE_FILTERS="null"
+  if [ -n "${SOURCE_SUBTYPE:-}${DB_TYPE:-}${CONNECTOR_TYPE:-}${CONVERSATION_ID:-}${CONTACT_ID:-}${SENDER_ROLE:-}${TIME_AFTER:-}${TIME_BEFORE:-}" ]; then
+    LOCAL_SOURCE_FILTERS=$(jq -n \
+      --arg subtype "${SOURCE_SUBTYPE:-}" --arg dbtype "${DB_TYPE:-}" \
+      --arg connector "${CONNECTOR_TYPE:-}" --arg conversation "${CONVERSATION_ID:-}" \
+      --arg contact "${CONTACT_ID:-}" --arg sender "${SENDER_ROLE:-}" \
+      --arg after "${TIME_AFTER:-}" --arg before "${TIME_BEFORE:-}" \
+      '{}
+      + (if $subtype != "" then {source_subtype: $subtype} else {} end)
+      + (if $dbtype != "" then {db_type: $dbtype} else {} end)
+      + (if $connector != "" then {connector_type: $connector} else {} end)
+      + (if $conversation != "" then {conversation_id: $conversation} else {} end)
+      + (if $contact != "" then {contact_id: $contact} else {} end)
+      + (if $sender != "" then {sender_role: $sender} else {} end)
+      + (if $after != "" then {time_after: $after} else {} end)
+      + (if $before != "" then {time_before: $before} else {} end)')
+  fi
   # Build slack_filters if any slack filter env is set
   SLACK_FILTERS="null"
   if [ -n "${SLACK_CHANNELS:-}${SLACK_USERS:-}${SLACK_DATE_FROM:-}${SLACK_DATE_TO:-}${SLACK_INCLUDE_THREADS:-}" ]; then
@@ -47,27 +68,34 @@ cmd_query() {
   if [ -n "$repos" ] && [ -z "$docs" ]; then MODE="repositories"
   elif [ -z "$repos" ] && [ -n "$docs" ]; then MODE="sources"
   else MODE="unified"; fi
+  if [ -n "${SEARCH_MODE:-}" ]; then MODE="$SEARCH_MODE"; fi
   DATA=$(jq -n \
     --arg q "$query" --arg mode "$MODE" \
     --argjson repos "$REPOS_JSON" --argjson docs "$DOCS_JSON" \
     --argjson folders "$FOLDERS_JSON" --argjson slack "$SLACK_JSON" \
-    --argjson slack_filters "$SLACK_FILTERS" \
+    --argjson slack_filters "$SLACK_FILTERS" --argjson local_filters "$LOCAL_SOURCE_FILTERS" \
     --arg cat "${CATEGORY:-}" --arg mt "${MAX_TOKENS:-}" \
+    --arg stream "${STREAM:-}" --arg include_sources "${INCLUDE_SOURCES:-}" \
     --arg fast "${FAST_MODE:-}" --arg skip "${SKIP_LLM:-}" \
     --arg rs "${REASONING_STRATEGY:-}" --arg model "${MODEL:-}" \
-    --arg bc "${BYPASS_CACHE:-}" --arg ifu "${INCLUDE_FOLLOW_UPS:-}" \
+    --arg bc "${BYPASS_CACHE:-}" --arg sct "${SEMANTIC_CACHE_THRESHOLD:-}" \
+    --arg ifu "${INCLUDE_FOLLOW_UPS:-}" \
     '{mode: "query", messages: [{role: "user", content: $q}], repositories: $repos,
      data_sources: $docs, search_mode: $mode, stream: false, include_sources: true}
     + (if ($folders | length) > 0 then {local_folders: $folders} else {} end)
     + (if ($slack | length) > 0 then {slack_workspaces: $slack} else {} end)
     + (if $slack_filters != null then {slack_filters: $slack_filters} else {} end)
+    + (if $local_filters != null then {local_source_filters: $local_filters} else {} end)
     + (if $cat != "" then {category: $cat} else {} end)
     + (if $mt != "" then {max_tokens: ($mt | tonumber)} else {} end)
+    + (if $stream != "" then {stream: ($stream == "true")} else {} end)
+    + (if $include_sources != "" then {include_sources: ($include_sources == "true")} else {} end)
     + (if $fast != "" then {fast_mode: ($fast == "true")} else {} end)
     + (if $skip != "" then {skip_llm: ($skip == "true")} else {} end)
     + (if $rs != "" then {reasoning_strategy: $rs} else {} end)
     + (if $model != "" then {model: $model} else {} end)
     + (if $bc != "" then {bypass_semantic_cache: ($bc == "true")} else {} end)
+    + (if $sct != "" then {semantic_cache_threshold: ($sct | tonumber)} else {} end)
     + (if $ifu != "" then {include_follow_ups: ($ifu == "true")} else {} end)')
   nia_post "$BASE_URL/search" "$DATA"
 }
@@ -109,7 +137,9 @@ cmd_universal() {
   if [ -z "$1" ]; then
     echo "Usage: search.sh universal <query> [top_k]"
     echo "  Env: INCLUDE_REPOS, INCLUDE_DOCS, INCLUDE_HF, ALPHA, COMPRESS,"
-    echo "       MAX_TOKENS, BOOST_LANGUAGES, LANGUAGE_BOOST, EXPAND_SYMBOLS, NATIVE_BOOSTING"
+    echo "       MAX_TOKENS, MAX_SOURCES, SOURCES_FOR_ANSWER, BYPASS_CACHE,"
+    echo "       SEMANTIC_CACHE_THRESHOLD, BOOST_LANGUAGES, LANGUAGE_BOOST,"
+    echo "       EXPAND_SYMBOLS, NATIVE_BOOSTING"
     return 1
   fi
   DATA=$(jq -n \
@@ -117,14 +147,20 @@ cmd_universal() {
     --arg ir "${INCLUDE_REPOS:-true}" --arg id "${INCLUDE_DOCS:-true}" \
     --arg ihf "${INCLUDE_HF:-}" --arg alpha "${ALPHA:-}" \
     --arg compress "${COMPRESS:-false}" --arg mt "${MAX_TOKENS:-}" \
+    --arg ms "${MAX_SOURCES:-}" --arg sfa "${SOURCES_FOR_ANSWER:-}" \
+    --arg bc "${BYPASS_CACHE:-}" --arg sct "${SEMANTIC_CACHE_THRESHOLD:-}" \
     --arg bl "${BOOST_LANGUAGES:-}" --arg lbf "${LANGUAGE_BOOST:-}" \
-    --arg es "${EXPAND_SYMBOLS:-}" --arg nb "${NATIVE_BOOSTING:-}" \
+    --arg es "${EXPAND_SYMBOLS:-}" --arg nb "${NATIVE_BOOSTING:-${USE_NATIVE_BOOSTING:-}}" \
     '{mode: "universal", query: $q, top_k: $k,
      include_repos: ($ir == "true"), include_docs: ($id == "true"),
      compress_output: ($compress == "true")}
     + (if $ihf != "" then {include_huggingface_datasets: ($ihf == "true")} else {} end)
     + (if $alpha != "" then {alpha: ($alpha | tonumber)} else {} end)
     + (if $mt != "" then {max_tokens: ($mt | tonumber)} else {} end)
+    + (if $ms != "" then {max_sources: ($ms | tonumber)} else {} end)
+    + (if $sfa != "" then {sources_for_answer: ($sfa | tonumber)} else {} end)
+    + (if $bc != "" then {bypass_cache: ($bc == "true")} else {} end)
+    + (if $sct != "" then {semantic_cache_threshold: ($sct | tonumber)} else {} end)
     + (if $bl != "" then {boost_languages: ($bl | split(","))} else {} end)
     + (if $lbf != "" then {language_boost_factor: ($lbf | tonumber)} else {} end)
     + (if $es != "" then {expand_symbols: ($es == "true")} else {} end)

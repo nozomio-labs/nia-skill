@@ -70,9 +70,15 @@ cmd_index() {
 
 # ─── list — list all indexed sources, optionally filtered by type
 cmd_list() {
-  local type="${1:-}"
+  local type="${1:-}" limit="${2:-}" offset="${3:-}"
   local url="$BASE_URL/sources"
-  if [ -n "$type" ]; then url="${url}?type=${type}"; fi
+  local sep="?"
+  if [ -n "$type" ]; then url="${url}${sep}type=${type}"; sep="&"; fi
+  if [ -n "$limit" ]; then url="${url}${sep}limit=${limit}"; sep="&"; fi
+  if [ -n "$offset" ]; then url="${url}${sep}offset=${offset}"; sep="&"; fi
+  if [ -n "${STATUS:-}" ]; then url="${url}${sep}status=$(echo "$STATUS" | jq -Rr @uri)"; sep="&"; fi
+  if [ -n "${QUERY:-}" ]; then url="${url}${sep}query=$(echo "$QUERY" | jq -Rr @uri)"; sep="&"; fi
+  if [ -n "${CATEGORY_ID:-}" ]; then url="${url}${sep}category_id=$(echo "$CATEGORY_ID" | jq -Rr @uri)"; fi
   nia_get "$url"
 }
 
@@ -121,7 +127,7 @@ cmd_sync() {
   local sid=$(resolve_source_id "$1" "${2:-}") type="${2:-}"
   local url="$BASE_URL/sources/${sid}/sync"
   if [ -n "$type" ]; then url="${url}?type=${type}"; fi
-  nia_post "$url" "{}"
+  nia_post "$url" "${SYNC_JSON:-{}}"
 }
 
 # ─── rename — change the display name of any source
@@ -147,15 +153,15 @@ cmd_subscribe() {
 # ─── read — read file content from an indexed source by path and optional line range
 cmd_read() {
   if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Usage: sources.sh read <source_id> <path> [line_start] [line_end]"
-    echo "  MAX_LENGTH  Max characters to return (100-100000)"
+    echo "Usage: sources.sh read <source_id> <path>"
+    echo "  Env: TYPE=<source_type> when reading local_folder/slack/google_drive"
     return 1
   fi
   local sid=$(resolve_source_id "$1") path=$(echo "$2" | sed 's/ /%20/g')
   local url="$BASE_URL/sources/${sid}/content?path=${path}"
-  if [ -n "${3:-}" ]; then url="${url}&line_start=$3"; fi
-  if [ -n "${4:-}" ]; then url="${url}&line_end=$4"; fi
-  if [ -n "${MAX_LENGTH:-}" ]; then url="${url}&max_length=${MAX_LENGTH}"; fi
+  if [ -n "${TYPE:-}" ]; then url="${url}&type=${TYPE}"; fi
+  if [ -n "${BRANCH:-}" ]; then url="${url}&branch=$(echo "$BRANCH" | jq -Rr @uri)"; fi
+  if [ -n "${URL:-}" ]; then url="${url}&url=$(echo "$URL" | jq -Rr @uri)"; fi
   nia_get_raw "$url" | jq -r '.content // .'
 }
 
@@ -164,36 +170,53 @@ cmd_grep() {
   if [ -z "$1" ] || [ -z "$2" ]; then
     echo "Usage: sources.sh grep <source_id> <pattern> [path]"
     echo "  Env: CASE_SENSITIVE, WHOLE_WORD, FIXED_STRING, OUTPUT_MODE,"
-    echo "       HIGHLIGHT, EXHAUSTIVE, LINES_AFTER, LINES_BEFORE, MAX_PER_FILE, MAX_TOTAL"
+    echo "       HIGHLIGHT, EXHAUSTIVE, LINES_AFTER, LINES_BEFORE, MAX_PER_FILE, MAX_TOTAL, TYPE"
     return 1
   fi
   local sid=$(resolve_source_id "$1")
   DATA=$(build_grep_json "$2" "${3:-}")
-  nia_post "$BASE_URL/sources/${sid}/grep" "$DATA"
+  local url="$BASE_URL/sources/${sid}/grep"
+  if [ -n "${TYPE:-}" ]; then url="${url}?type=${TYPE}"; fi
+  nia_post "$url" "$DATA"
 }
 
 # ─── tree — print the full file tree of a source
 cmd_tree() {
   if [ -z "$1" ]; then echo "Usage: sources.sh tree <source_id>"; return 1; fi
   local sid=$(resolve_source_id "$1")
-  nia_get_raw "$BASE_URL/sources/${sid}/tree" | jq '.tree_string // .'
+  local url="$BASE_URL/sources/${sid}/tree"
+  local sep="?"
+  if [ -n "${TYPE:-}" ]; then url="${url}${sep}type=${TYPE}"; sep="&"; fi
+  if [ -n "${BRANCH:-}" ]; then url="${url}${sep}branch=$(echo "$BRANCH" | jq -Rr @uri)"; sep="&"; fi
+  if [ -n "${MAX_DEPTH:-}" ]; then url="${url}${sep}max_depth=${MAX_DEPTH}"; fi
+  nia_get_raw "$url" | jq '.tree_string // .formatted_tree // .'
 }
 
 # ─── ls — list files/dirs in a specific path within a source
 cmd_ls() {
-  if [ -z "$1" ]; then echo "Usage: sources.sh ls <source_id> [path]"; return 1; fi
-  local sid=$(resolve_source_id "$1") dir=$(echo "${2:-/}" | jq -Rr @uri)
-  nia_get "$BASE_URL/sources/${sid}/tree?path=${dir}"
+  if [ -z "$1" ]; then echo "Usage: sources.sh ls <source_id>"; return 1; fi
+  if [ -n "${2:-}" ]; then
+    echo "Error: the current /sources tree endpoint is not path-scoped. Use tree, read, or grep instead."
+    return 1
+  fi
+  MAX_DEPTH="${MAX_DEPTH:-2}" cmd_tree "$1"
 }
 
 # ─── classification — get or update the auto-classification for a source
 cmd_classification() {
   if [ -z "$1" ]; then echo "Usage: sources.sh classification <source_id> [type]"; return 1; fi
-  local sid=$(resolve_source_id "$1" "${2:-}") type="${2:-}"
+  local sid=$(resolve_source_id "$1" "${2:-${TYPE:-}}") type="${2:-${TYPE:-}}"
   local url="$BASE_URL/sources/${sid}/classification"
   if [ -n "$type" ]; then url="${url}?type=${type}"; fi
   if [ "${ACTION:-}" = "update" ]; then
-    nia_patch "$url" "{}"
+    if [ -z "${CATEGORIES:-}" ]; then
+      echo "Error: set CATEGORIES=cat1,cat2 to update classification"
+      return 1
+    fi
+    DATA=$(jq -n --arg c "$CATEGORIES" --arg iu "${INCLUDE_UNCATEGORIZED:-}" \
+      '{categories: ($c | split(","))}
+      + (if $iu != "" then {include_uncategorized: ($iu == "true")} else {} end)')
+    nia_patch "$url" "$DATA"
   else
     nia_get "$url"
   fi
@@ -208,7 +231,9 @@ cmd_assign_category() {
   else
     DATA=$(jq -n --arg c "$cat_id" '{category_id: $c}')
   fi
-  nia_patch "$BASE_URL/sources/${sid}" "$DATA"
+  local url="$BASE_URL/sources/${sid}"
+  if [ -n "${TYPE:-}" ]; then url="${url}?type=${TYPE}"; fi
+  nia_patch "$url" "$DATA"
 }
 
 # ─── upload-url — get a signed URL for file upload (PDF, spreadsheets)
@@ -235,13 +260,20 @@ cmd_upload_url() {
 cmd_bulk_delete() {
   if [ -z "$1" ]; then
     echo "Usage: sources.sh bulk-delete <id:type> [id:type ...]"
-    echo "  type: repository|documentation|research_paper|context|local_folder|slack"
+    echo "  type: repository|documentation|research_paper|context|local_folder"
     echo "  Example: sources.sh bulk-delete abc123:repository def456:documentation"
     return 1
   fi
   local items="[]"
   for item in "$@"; do
     local id="${item%%:*}" type="${item#*:}"
+    case "$type" in
+      repository|documentation|research_paper|context|local_folder) ;;
+      *)
+        echo "Unsupported bulk-delete type: $type"
+        return 1
+        ;;
+    esac
     items=$(echo "$items" | jq --arg id "$id" --arg t "$type" '. + [{id: $id, type: $t}]')
   done
   DATA=$(jq -n --argjson items "$items" '{items: $items}')
@@ -272,7 +304,7 @@ case "${1:-}" in
     echo ""
     echo "Commands:"
     echo "  index            Index a documentation site"
-    echo "  list [type]      List sources (repo|documentation|research_paper|huggingface_dataset|local_folder|slack)"
+    echo "  list [type]      List sources (repository|documentation|research_paper|huggingface_dataset|local_folder|slack|google_drive)"
     echo "  get              Get source details"
     echo "  resolve          Resolve source by name/URL"
     echo "  update           Update source display name / category"
@@ -284,7 +316,7 @@ case "${1:-}" in
     echo "  grep             Search source content with regex"
     echo "  tree             Get source file tree"
     echo "  ls               List directory in source"
-    echo "  classification   Get/update source classification"
+    echo "  classification   Get/update source classification (PATCH uses ACTION=update and CATEGORIES=csv)"
     echo "  assign-category  Assign category to source"
     echo "  upload-url       Get signed URL for file upload (PDF, CSV, TSV, XLSX, XLS)"
     echo "  bulk-delete      Delete multiple resources at once"
