@@ -101,11 +101,17 @@ Env: `SAVE_KEY=true` to write `~/.config/nia/api_key`, `IDEMPOTENCY_KEY`
 ./scripts/sources.sh sync <source_id> [type]                      # Re-sync source
 ./scripts/sources.sh rename <source_id_or_name> <new_name>        # Rename source
 ./scripts/sources.sh subscribe <url> [source_type] [ref]          # Subscribe to global source
-./scripts/sources.sh read <source_id> <path>                      # Read content
+./scripts/sources.sh read <source_id> [path]                      # Read content
 ./scripts/sources.sh grep <source_id> <pattern> [path]            # Grep content
 ./scripts/sources.sh tree <source_id>                             # Get file tree
 ./scripts/sources.sh ls <source_id>                               # Shallow tree view
 ./scripts/sources.sh classification <source_id> [type]            # Get/update classification
+./scripts/sources.sh curation <source_id> [type]                  # Get trust/overlay/annotations
+./scripts/sources.sh update-curation <source_id> [type]           # Update trust/overlay
+./scripts/sources.sh annotations <source_id> [type]               # List annotations
+./scripts/sources.sh add-annotation <source_id> <content> [kind]  # Create annotation
+./scripts/sources.sh update-annotation <source_id> <annotation_id> [content] [kind] # Update annotation
+./scripts/sources.sh delete-annotation <source_id> <annotation_id> [type] # Delete annotation
 ./scripts/sources.sh assign-category <source_id> <cat_id|null>    # Assign category
 ./scripts/sources.sh upload-url <filename>                        # Get signed URL for file upload (PDF, CSV, TSV, XLSX, XLS)
 ./scripts/sources.sh bulk-delete <id:type> [id:type ...]          # Bulk delete resources
@@ -114,8 +120,9 @@ Env: `SAVE_KEY=true` to write `~/.config/nia/api_key`, `IDEMPOTENCY_KEY`
 **Index environment variables**: `DISPLAY_NAME`, `FOCUS`, `EXTRACT_BRANDING`, `EXTRACT_IMAGES`, `IS_PDF`, `IS_SPREADSHEET`, `URL_PATTERNS`, `EXCLUDE_PATTERNS`, `MAX_DEPTH`, `WAIT_FOR`, `CHECK_LLMS_TXT`, `LLMS_TXT_STRATEGY`, `INCLUDE_SCREENSHOT`, `ONLY_MAIN_CONTENT`, `ADD_GLOBAL`, `MAX_AGE`
 
 **List environment variables**: `STATUS`, `QUERY`, `CATEGORY_ID`
-**Generic source env**: `TYPE=<repository|documentation|research_paper|huggingface_dataset|local_folder|slack|google_drive>`, `BRANCH`, `URL`, `MAX_DEPTH`, `SYNC_JSON`
+**Generic source env**: `TYPE=<repository|documentation|research_paper|huggingface_dataset|local_folder|slack|google_drive>`, `BRANCH`, `URL`, `PAGE`, `TREE_NODE_ID`, `LINE_START`, `LINE_END`, `MAX_LENGTH`, `MAX_DEPTH`, `SYNC_JSON`
 **Classification update env**: `ACTION=update`, `CATEGORIES=cat1,cat2`, `INCLUDE_UNCATEGORIZED=true|false`
+**Curation update env**: `TRUST_LEVEL` (low|medium|high), `OVERLAY_KIND` (custom|nia_verified), `OVERLAY_SUMMARY`, `OVERLAY_GUIDANCE`, `RECOMMENDED_QUERIES` (csv), `CLEAR_OVERLAY=true|false`
 **Grep environment variables**: `CASE_SENSITIVE`, `WHOLE_WORD`, `FIXED_STRING`, `OUTPUT_MODE`, `HIGHLIGHT`, `EXHAUSTIVE`, `LINES_AFTER`, `LINES_BEFORE`, `MAX_PER_FILE`, `MAX_TOTAL`
 
 **Flexible identifiers**: Most endpoints accept UUID, display name, or URL:
@@ -136,7 +143,7 @@ Env: `SAVE_KEY=true` to write `~/.config/nia/api_key`, `IDEMPOTENCY_KEY`
 ./scripts/repos.sh rename <repo_id> <new_name>                   # Rename display name
 ```
 
-**Tree environment variables**: `INCLUDE_PATHS`, `EXCLUDE_PATHS`, `FILE_EXTENSIONS`, `EXCLUDE_EXTENSIONS`, `SHOW_FULL_PATHS`
+**Tree environment variables**: `MAX_DEPTH`, `INCLUDE_PATHS`, `EXCLUDE_PATHS`, `FILE_EXTENSIONS`, `EXCLUDE_EXTENSIONS`, `SHOW_FULL_PATHS`
 
 ### search.sh — Search
 
@@ -147,7 +154,7 @@ Env: `SAVE_KEY=true` to write `~/.config/nia/api_key`, `IDEMPOTENCY_KEY`
 ./scripts/search.sh deep <query> [output_format]                 # Deep research (Pro)
 ```
 
-**query** — targeted search with AI response and sources. Env: `LOCAL_FOLDERS`, `SLACK_WORKSPACES`, `CATEGORY`, `MAX_TOKENS`, `STREAM`, `INCLUDE_SOURCES`, `FAST_MODE`, `SKIP_LLM`, `REASONING_STRATEGY` (vector|tree|hybrid), `MODEL`, `SEARCH_MODE`, `BYPASS_CACHE`, `SEMANTIC_CACHE_THRESHOLD`, `INCLUDE_FOLLOW_UPS`. Slack filters: `SLACK_CHANNELS`, `SLACK_USERS`, `SLACK_DATE_FROM`, `SLACK_DATE_TO`, `SLACK_INCLUDE_THREADS`. Local source filters: `SOURCE_SUBTYPE`, `DB_TYPE`, `CONNECTOR_TYPE`, `CONVERSATION_ID`, `CONTACT_ID`, `SENDER_ROLE`, `TIME_AFTER`, `TIME_BEFORE`. **This is the only search command that supports Slack.**
+**query** — targeted search with AI response and sources. Env: `LOCAL_FOLDERS`, `SLACK_WORKSPACES`, `CATEGORY`, `MAX_TOKENS`, `STREAM`, `INCLUDE_SOURCES`, `FAST_MODE`, `SKIP_LLM`, `REASONING_STRATEGY` (vector|tree|hybrid), `MODEL`, `SEARCH_MODE`, `BYPASS_CACHE`, `SEMANTIC_CACHE_THRESHOLD`, `INCLUDE_FOLLOW_UPS`, `TRUST_MINIMUM_TIER`, `TRUST_VERIFIED_ONLY`, `TRUST_REQUIRE_OVERLAY`. Slack filters: `SLACK_CHANNELS`, `SLACK_USERS`, `SLACK_DATE_FROM`, `SLACK_DATE_TO`, `SLACK_INCLUDE_THREADS`. Local source filters: `SOURCE_SUBTYPE`, `DB_TYPE`, `CONNECTOR_TYPE`, `CONVERSATION_ID`, `CONTACT_ID`, `SENDER_ROLE`, `TIME_AFTER`, `TIME_BEFORE`. **This is the only search command that supports Slack.**
 **universal** — hybrid vector + BM25 across all indexed public sources (repos + docs + HF datasets). **Does NOT include Slack.** Env: `INCLUDE_REPOS`, `INCLUDE_DOCS`, `INCLUDE_HF`, `ALPHA`, `COMPRESS`, `MAX_TOKENS`, `MAX_SOURCES`, `SOURCES_FOR_ANSWER`, `BYPASS_CACHE`, `SEMANTIC_CACHE_THRESHOLD`, `BOOST_LANGUAGES`, `EXPAND_SYMBOLS`
 **web** — web search. Env: `CATEGORY` (github|company|research|news|tweet|pdf|blog), `DAYS_BACK`, `FIND_SIMILAR_TO`
 **deep** — deep AI research (Pro). Env: `VERBOSE`
@@ -296,7 +303,7 @@ Hybrid env: `PATTERN` (regex pre-filter), `LANGUAGE`, `FILE_SHA256`
 ### categories.sh — Organize Sources
 
 ```bash
-./scripts/categories.sh list                                     # List categories
+./scripts/categories.sh list [limit] [offset]                    # List categories
 ./scripts/categories.sh create <name> [color] [order]            # Create category
 ./scripts/categories.sh update <cat_id> [name] [color] [order]   # Update category
 ./scripts/categories.sh delete <cat_id>                          # Delete category

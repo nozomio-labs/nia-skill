@@ -114,12 +114,16 @@ cmd_ls() {
 cmd_read() {
   if [ -z "$1" ] || [ -z "$2" ]; then
     echo "Usage: folders.sh read <folder_id> <file_path>"
+    echo "  Env: LINE_START, LINE_END, MAX_LENGTH"
     return 1
   fi
   local sid fpath url
   sid=$(resolve_source_id "$1" local_folder)
-  fpath=$(echo "$2" | jq -Rr @uri)
+  fpath=$(urlencode "$2")
   url="$BASE_URL/sources/${sid}/content?type=local_folder&path=${fpath}"
+  if [ -n "${LINE_START:-}" ]; then url="${url}&line_start=${LINE_START}"; fi
+  if [ -n "${LINE_END:-}" ]; then url="${url}&line_end=${LINE_END}"; fi
+  if [ -n "${MAX_LENGTH:-}" ]; then url="${url}&max_length=${MAX_LENGTH}"; fi
   nia_get_raw "$url" | jq -r '.content // .'
 }
 

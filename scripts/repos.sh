@@ -35,9 +35,20 @@ cmd_status() {
 
 # ─── read — read a single file's content from an indexed repo
 cmd_read() {
-  if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: repos.sh read <owner/repo> <path/to/file>"; return 1; fi
-  local rid=$(resolve_source_id "$1" repository) fp=$(echo "$2" | sed 's/\//%2F/g')
-  nia_get_raw "$BASE_URL/sources/${rid}/content?type=repository&path=${fp}" | jq -r '.content // .'
+  if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: repos.sh read <owner/repo> <path/to/file>"
+    echo "  Env: BRANCH, LINE_START, LINE_END, MAX_LENGTH"
+    return 1
+  fi
+  local rid fp url
+  rid=$(resolve_source_id "$1" repository)
+  fp=$(urlencode "$2")
+  url="$BASE_URL/sources/${rid}/content?type=repository&path=${fp}"
+  if [ -n "${BRANCH:-}" ]; then url="${url}&branch=$(urlencode "$BRANCH")"; fi
+  if [ -n "${LINE_START:-}" ]; then url="${url}&line_start=${LINE_START}"; fi
+  if [ -n "${LINE_END:-}" ]; then url="${url}&line_end=${LINE_END}"; fi
+  if [ -n "${MAX_LENGTH:-}" ]; then url="${url}&max_length=${MAX_LENGTH}"; fi
+  nia_get_raw "$url" | jq -r '.content // .'
 }
 
 # ─── grep — regex search across all files in an indexed repo
@@ -60,19 +71,20 @@ cmd_grep() {
 cmd_tree() {
   if [ -z "$1" ]; then
     echo "Usage: repos.sh tree <owner/repo> [branch]"
-    echo "  Env: INCLUDE_PATHS, EXCLUDE_PATHS, FILE_EXTENSIONS, EXCLUDE_EXTENSIONS, SHOW_FULL_PATHS"
+    echo "  Env: MAX_DEPTH, INCLUDE_PATHS, EXCLUDE_PATHS, FILE_EXTENSIONS, EXCLUDE_EXTENSIONS, SHOW_FULL_PATHS"
     return 1
   fi
   local rid=$(resolve_source_id "$1" repository) branch="${2:-}"
   local params=""
-  if [ -n "$branch" ]; then params="${params}&branch=${branch}"; fi
+  if [ -n "$branch" ]; then params="${params}&branch=$(urlencode "$branch")"; fi
+  if [ -n "${MAX_DEPTH:-}" ]; then params="${params}&max_depth=${MAX_DEPTH}"; fi
   if [ -n "${INCLUDE_PATHS:-}" ]; then params="${params}&include_paths=${INCLUDE_PATHS}"; fi
   if [ -n "${EXCLUDE_PATHS:-}" ]; then params="${params}&exclude_paths=${EXCLUDE_PATHS}"; fi
   if [ -n "${FILE_EXTENSIONS:-}" ]; then params="${params}&file_extensions=${FILE_EXTENSIONS}"; fi
   if [ -n "${EXCLUDE_EXTENSIONS:-}" ]; then params="${params}&exclude_extensions=${EXCLUDE_EXTENSIONS}"; fi
   if [ "${SHOW_FULL_PATHS:-}" = "true" ]; then params="${params}&show_full_paths=true"; fi
   local url="$BASE_URL/sources/${rid}/tree?type=repository${params}"
-  nia_get_raw "$url" | jq '.formatted_tree // .'
+  nia_get_raw "$url" | jq '.tree_string // .formatted_tree // .'
 }
 
 # ─── delete — remove an indexed repo and all its data

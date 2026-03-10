@@ -94,7 +94,7 @@ cmd_get() {
 # ─── resolve — look up a source by name, URL, or identifier
 cmd_resolve() {
   if [ -z "$1" ]; then echo "Usage: sources.sh resolve <identifier> [type]"; return 1; fi
-  local id=$(echo "$1" | sed 's/ /%20/g') type="${2:-}"
+  local id=$(urlencode "$1") type="${2:-}"
   local url="$BASE_URL/sources/resolve?identifier=${id}"
   if [ -n "$type" ]; then url="${url}&type=${type}"; fi
   nia_get "$url"
@@ -103,7 +103,7 @@ cmd_resolve() {
 # ─── update — change a source's display name or category assignment
 cmd_update() {
   if [ -z "$1" ]; then echo "Usage: sources.sh update <source_id> [display_name] [category_id]"; return 1; fi
-  local sid=$(resolve_source_id "$1") dname="${2:-}" cat_id="${3:-}"
+  local sid=$(resolve_source_id "$1" "${TYPE:-}") dname="${2:-}" cat_id="${3:-}"
   DATA=$(jq -n --arg dn "$dname" --arg cat "$cat_id" \
     '{} + (if $dn != "" then {display_name: $dn} else {} end)
        + (if $cat == "null" then {category_id: null} elif $cat != "" then {category_id: $cat} else {} end)')
@@ -133,7 +133,7 @@ cmd_sync() {
 # ─── rename — change the display name of any source
 cmd_rename() {
   if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: sources.sh rename <source_id> <new_name>"; return 1; fi
-  local sid=$(resolve_source_id "$1")
+  local sid=$(resolve_source_id "$1" "${TYPE:-}")
   DATA=$(jq -n --arg name "$2" '{display_name: $name}')
   nia_patch "$BASE_URL/sources/${sid}" "$DATA"
 }
@@ -152,16 +152,26 @@ cmd_subscribe() {
 
 # ─── read — read file content from an indexed source by path and optional line range
 cmd_read() {
-  if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Usage: sources.sh read <source_id> <path>"
-    echo "  Env: TYPE=<source_type> when reading local_folder/slack/google_drive"
+  if [ -z "$1" ]; then
+    echo "Usage: sources.sh read <source_id> [path]"
+    echo "  Env: TYPE=<source_type>, BRANCH, URL, PAGE, TREE_NODE_ID,"
+    echo "       LINE_START, LINE_END, MAX_LENGTH"
     return 1
   fi
-  local sid=$(resolve_source_id "$1") path=$(echo "$2" | sed 's/ /%20/g')
-  local url="$BASE_URL/sources/${sid}/content?path=${path}"
-  if [ -n "${TYPE:-}" ]; then url="${url}&type=${TYPE}"; fi
-  if [ -n "${BRANCH:-}" ]; then url="${url}&branch=$(echo "$BRANCH" | jq -Rr @uri)"; fi
-  if [ -n "${URL:-}" ]; then url="${url}&url=$(echo "$URL" | jq -Rr @uri)"; fi
+  local sid path url sep
+  sid=$(resolve_source_id "$1" "${TYPE:-}")
+  path="${2:-}"
+  url="$BASE_URL/sources/${sid}/content"
+  sep="?"
+  if [ -n "${TYPE:-}" ]; then url="${url}${sep}type=${TYPE}"; sep="&"; fi
+  if [ -n "$path" ]; then url="${url}${sep}path=$(urlencode "$path")"; sep="&"; fi
+  if [ -n "${URL:-}" ]; then url="${url}${sep}url=$(urlencode "$URL")"; sep="&"; fi
+  if [ -n "${BRANCH:-}" ]; then url="${url}${sep}branch=$(urlencode "$BRANCH")"; sep="&"; fi
+  if [ -n "${PAGE:-}" ]; then url="${url}${sep}page=${PAGE}"; sep="&"; fi
+  if [ -n "${TREE_NODE_ID:-}" ]; then url="${url}${sep}tree_node_id=$(urlencode "$TREE_NODE_ID")"; sep="&"; fi
+  if [ -n "${LINE_START:-}" ]; then url="${url}${sep}line_start=${LINE_START}"; sep="&"; fi
+  if [ -n "${LINE_END:-}" ]; then url="${url}${sep}line_end=${LINE_END}"; sep="&"; fi
+  if [ -n "${MAX_LENGTH:-}" ]; then url="${url}${sep}max_length=${MAX_LENGTH}"; fi
   nia_get_raw "$url" | jq -r '.content // .'
 }
 
@@ -173,7 +183,7 @@ cmd_grep() {
     echo "       HIGHLIGHT, EXHAUSTIVE, LINES_AFTER, LINES_BEFORE, MAX_PER_FILE, MAX_TOTAL, TYPE"
     return 1
   fi
-  local sid=$(resolve_source_id "$1")
+  local sid=$(resolve_source_id "$1" "${TYPE:-}")
   DATA=$(build_grep_json "$2" "${3:-}")
   local url="$BASE_URL/sources/${sid}/grep"
   if [ -n "${TYPE:-}" ]; then url="${url}?type=${TYPE}"; fi
@@ -183,11 +193,11 @@ cmd_grep() {
 # ─── tree — print the full file tree of a source
 cmd_tree() {
   if [ -z "$1" ]; then echo "Usage: sources.sh tree <source_id>"; return 1; fi
-  local sid=$(resolve_source_id "$1")
+  local sid=$(resolve_source_id "$1" "${TYPE:-}")
   local url="$BASE_URL/sources/${sid}/tree"
   local sep="?"
   if [ -n "${TYPE:-}" ]; then url="${url}${sep}type=${TYPE}"; sep="&"; fi
-  if [ -n "${BRANCH:-}" ]; then url="${url}${sep}branch=$(echo "$BRANCH" | jq -Rr @uri)"; sep="&"; fi
+  if [ -n "${BRANCH:-}" ]; then url="${url}${sep}branch=$(urlencode "$BRANCH")"; sep="&"; fi
   if [ -n "${MAX_DEPTH:-}" ]; then url="${url}${sep}max_depth=${MAX_DEPTH}"; fi
   nia_get_raw "$url" | jq '.tree_string // .formatted_tree // .'
 }
@@ -222,10 +232,102 @@ cmd_classification() {
   fi
 }
 
+# ─── curation — fetch trust signals, overlay guidance, and annotations for a source
+cmd_curation() {
+  if [ -z "$1" ]; then echo "Usage: sources.sh curation <source_id> [type]"; return 1; fi
+  local sid=$(resolve_source_id "$1" "${2:-${TYPE:-}}") type="${2:-${TYPE:-}}"
+  local url="$BASE_URL/sources/${sid}/curation"
+  if [ -n "$type" ]; then url="${url}?type=${type}"; fi
+  nia_get "$url"
+}
+
+# ─── update-curation — update source trust level or curated overlay
+cmd_update_curation() {
+  if [ -z "$1" ]; then
+    echo "Usage: sources.sh update-curation <source_id> [type]"
+    echo "  Env: TRUST_LEVEL, OVERLAY_KIND, OVERLAY_SUMMARY, OVERLAY_GUIDANCE,"
+    echo "       RECOMMENDED_QUERIES, CLEAR_OVERLAY"
+    return 1
+  fi
+  if [ -z "${TRUST_LEVEL:-}${OVERLAY_KIND:-}${OVERLAY_SUMMARY:-}${OVERLAY_GUIDANCE:-}${RECOMMENDED_QUERIES:-}${CLEAR_OVERLAY:-}" ]; then
+    echo "Error: set at least one of TRUST_LEVEL, OVERLAY_KIND, OVERLAY_SUMMARY, OVERLAY_GUIDANCE, RECOMMENDED_QUERIES, CLEAR_OVERLAY"
+    return 1
+  fi
+  local sid=$(resolve_source_id "$1" "${2:-${TYPE:-}}") type="${2:-${TYPE:-}}"
+  DATA=$(jq -n \
+    --arg trust "${TRUST_LEVEL:-}" --arg kind "${OVERLAY_KIND:-}" \
+    --arg summary "${OVERLAY_SUMMARY:-}" --arg guidance "${OVERLAY_GUIDANCE:-}" \
+    --arg queries "${RECOMMENDED_QUERIES:-}" --arg clear "${CLEAR_OVERLAY:-}" \
+    '{} + (if $trust != "" then {trust_level: $trust} else {} end)
+       + (if $kind != "" then {overlay_kind: $kind} else {} end)
+       + (if $summary != "" then {overlay_summary: $summary} else {} end)
+       + (if $guidance != "" then {overlay_guidance: $guidance} else {} end)
+       + (if $queries != "" then {recommended_queries: ($queries | split(","))} else {} end)
+       + (if $clear != "" then {clear_overlay: ($clear == "true")} else {} end)')
+  local url="$BASE_URL/sources/${sid}/curation"
+  if [ -n "$type" ]; then url="${url}?type=${type}"; fi
+  nia_put "$url" "$DATA"
+}
+
+# ─── annotations — list saved annotations for a source
+cmd_annotations() {
+  if [ -z "$1" ]; then echo "Usage: sources.sh annotations <source_id> [type]"; return 1; fi
+  local sid=$(resolve_source_id "$1" "${2:-${TYPE:-}}") type="${2:-${TYPE:-}}"
+  local url="$BASE_URL/sources/${sid}/annotations"
+  if [ -n "$type" ]; then url="${url}?type=${type}"; fi
+  nia_get "$url"
+}
+
+# ─── add-annotation — attach a note/tip/warning/gotcha to a source
+cmd_add_annotation() {
+  if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: sources.sh add-annotation <source_id> <content> [kind] [type]"
+    return 1
+  fi
+  local sid=$(resolve_source_id "$1" "${4:-${TYPE:-}}") type="${4:-${TYPE:-}}"
+  DATA=$(jq -n --arg content "$2" --arg kind "${3:-note}" \
+    '{content: $content}
+    + (if $kind != "" then {kind: $kind} else {} end)')
+  local url="$BASE_URL/sources/${sid}/annotations"
+  if [ -n "$type" ]; then url="${url}?type=${type}"; fi
+  nia_post "$url" "$DATA"
+}
+
+# ─── update-annotation — update an existing source annotation
+cmd_update_annotation() {
+  if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: sources.sh update-annotation <source_id> <annotation_id> [content] [kind] [type]"
+    echo "  Pass '' for content to update only kind, or use ANNOTATION_CONTENT / ANNOTATION_KIND env vars."
+    return 1
+  fi
+  local content="${3:-${ANNOTATION_CONTENT:-}}"
+  local kind="${4:-${ANNOTATION_KIND:-}}"
+  if [ -z "$content" ] && [ -z "$kind" ]; then
+    echo "Error: provide content and/or kind"
+    return 1
+  fi
+  local sid=$(resolve_source_id "$1" "${5:-${TYPE:-}}") type="${5:-${TYPE:-}}"
+  DATA=$(jq -n --arg content "$content" --arg kind "$kind" \
+    '{} + (if $content != "" then {content: $content} else {} end)
+       + (if $kind != "" then {kind: $kind} else {} end)')
+  local url="$BASE_URL/sources/${sid}/annotations/$2"
+  if [ -n "$type" ]; then url="${url}?type=${type}"; fi
+  nia_patch "$url" "$DATA"
+}
+
+# ─── delete-annotation — remove an annotation from a source
+cmd_delete_annotation() {
+  if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: sources.sh delete-annotation <source_id> <annotation_id> [type]"; return 1; fi
+  local sid=$(resolve_source_id "$1" "${3:-${TYPE:-}}") type="${3:-${TYPE:-}}"
+  local url="$BASE_URL/sources/${sid}/annotations/$2"
+  if [ -n "$type" ]; then url="${url}?type=${type}"; fi
+  nia_delete "$url"
+}
+
 # ─── assign-category — assign (or remove with 'null') a category for a source
 cmd_assign_category() {
   if [ -z "$1" ] || [ -z "$2" ]; then echo "Usage: sources.sh assign-category <source_id> <category_id|null>"; return 1; fi
-  local sid=$(resolve_source_id "$1") cat_id="$2"
+  local sid=$(resolve_source_id "$1" "${TYPE:-}") cat_id="$2"
   if [ "$cat_id" = "null" ]; then
     DATA='{"category_id": null}'
   else
@@ -296,6 +398,12 @@ case "${1:-}" in
   tree)             shift; cmd_tree "$@" ;;
   ls)               shift; cmd_ls "$@" ;;
   classification)   shift; cmd_classification "$@" ;;
+  curation)         shift; cmd_curation "$@" ;;
+  update-curation)  shift; cmd_update_curation "$@" ;;
+  annotations)      shift; cmd_annotations "$@" ;;
+  add-annotation)   shift; cmd_add_annotation "$@" ;;
+  update-annotation) shift; cmd_update_annotation "$@" ;;
+  delete-annotation) shift; cmd_delete_annotation "$@" ;;
   assign-category)  shift; cmd_assign_category "$@" ;;
   upload-url)       shift; cmd_upload_url "$@" ;;
   bulk-delete)      shift; cmd_bulk_delete "$@" ;;
@@ -317,6 +425,12 @@ case "${1:-}" in
     echo "  tree             Get source file tree"
     echo "  ls               List directory in source"
     echo "  classification   Get/update source classification (PATCH uses ACTION=update and CATEGORIES=csv)"
+    echo "  curation         Get source trust signals, overlay, and annotations"
+    echo "  update-curation  Update trust level / curated overlay"
+    echo "  annotations      List source annotations"
+    echo "  add-annotation   Create source annotation"
+    echo "  update-annotation Update source annotation"
+    echo "  delete-annotation Delete source annotation"
     echo "  assign-category  Assign category to source"
     echo "  upload-url       Get signed URL for file upload (PDF, CSV, TSV, XLSX, XLS)"
     echo "  bulk-delete      Delete multiple resources at once"

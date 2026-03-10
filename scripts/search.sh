@@ -12,7 +12,8 @@ cmd_query() {
     echo "  Env: LOCAL_FOLDERS, SLACK_WORKSPACES, CATEGORY, MAX_TOKENS,"
     echo "       STREAM, INCLUDE_SOURCES, FAST_MODE, SKIP_LLM,"
     echo "       REASONING_STRATEGY, MODEL, SEARCH_MODE,"
-    echo "       BYPASS_CACHE, SEMANTIC_CACHE_THRESHOLD, INCLUDE_FOLLOW_UPS"
+    echo "       BYPASS_CACHE, SEMANTIC_CACHE_THRESHOLD, INCLUDE_FOLLOW_UPS,"
+    echo "       TRUST_MINIMUM_TIER, TRUST_VERIFIED_ONLY, TRUST_REQUIRE_OVERLAY"
     echo "  Slack filter env: SLACK_CHANNELS, SLACK_USERS, SLACK_DATE_FROM,"
     echo "       SLACK_DATE_TO, SLACK_INCLUDE_THREADS"
     echo "  Local source filter env: SOURCE_SUBTYPE, DB_TYPE, CONNECTOR_TYPE,"
@@ -64,6 +65,17 @@ cmd_query() {
       + (if $dt != "" then {date_to: $dt} else {} end)
       + (if $it != "" then {include_threads: ($it == "true")} else {} end)')
   fi
+  SOURCE_TRUST_FILTER="null"
+  if [ -n "${TRUST_MINIMUM_TIER:-}${TRUST_VERIFIED_ONLY:-}${TRUST_REQUIRE_OVERLAY:-}" ]; then
+    SOURCE_TRUST_FILTER=$(jq -n \
+      --arg tier "${TRUST_MINIMUM_TIER:-}" \
+      --arg verified "${TRUST_VERIFIED_ONLY:-}" \
+      --arg overlay "${TRUST_REQUIRE_OVERLAY:-}" \
+      '{}
+      + (if $tier != "" then {minimum_trust_tier: $tier} else {} end)
+      + (if $verified != "" then {verified_only: ($verified == "true")} else {} end)
+      + (if $overlay != "" then {require_overlay: ($overlay == "true")} else {} end)')
+  fi
   # Auto-detect search mode
   if [ -n "$repos" ] && [ -z "$docs" ]; then MODE="repositories"
   elif [ -z "$repos" ] && [ -n "$docs" ]; then MODE="sources"
@@ -74,6 +86,7 @@ cmd_query() {
     --argjson repos "$REPOS_JSON" --argjson docs "$DOCS_JSON" \
     --argjson folders "$FOLDERS_JSON" --argjson slack "$SLACK_JSON" \
     --argjson slack_filters "$SLACK_FILTERS" --argjson local_filters "$LOCAL_SOURCE_FILTERS" \
+    --argjson trust_filter "$SOURCE_TRUST_FILTER" \
     --arg cat "${CATEGORY:-}" --arg mt "${MAX_TOKENS:-}" \
     --arg stream "${STREAM:-}" --arg include_sources "${INCLUDE_SOURCES:-}" \
     --arg fast "${FAST_MODE:-}" --arg skip "${SKIP_LLM:-}" \
@@ -86,6 +99,7 @@ cmd_query() {
     + (if ($slack | length) > 0 then {slack_workspaces: $slack} else {} end)
     + (if $slack_filters != null then {slack_filters: $slack_filters} else {} end)
     + (if $local_filters != null then {local_source_filters: $local_filters} else {} end)
+    + (if $trust_filter != null then {source_trust_filter: $trust_filter} else {} end)
     + (if $cat != "" then {category: $cat} else {} end)
     + (if $mt != "" then {max_tokens: ($mt | tonumber)} else {} end)
     + (if $stream != "" then {stream: ($stream == "true")} else {} end)

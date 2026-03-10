@@ -18,7 +18,7 @@ nia_auth() {
 }
 
 urlencode() {
-  echo "$1" | sed 's/ /%20/g; s/\//%2F/g'
+  jq -nr --arg v "$1" '$v|@uri'
 }
 
 # Generic curl wrapper: nia_curl METHOD URL [DATA]

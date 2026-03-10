@@ -7,7 +7,10 @@ source "$SCRIPT_DIR/lib.sh"
 
 # ─── list — list all categories you've created
 cmd_list() {
-  nia_get "$BASE_URL/categories"
+  local limit="${1:-}" offset="${2:-}" url="$BASE_URL/categories" sep="?"
+  if [ -n "$limit" ]; then url="${url}${sep}limit=${limit}"; sep="&"; fi
+  if [ -n "$offset" ]; then url="${url}${sep}offset=${offset}"; fi
+  nia_get "$url"
 }
 
 # ─── create — create a new category with optional color and sort order
@@ -59,7 +62,7 @@ case "${1:-}" in
     echo "Usage: $(basename "$0") <command> [args...]"
     echo ""
     echo "Commands:"
-    echo "  list     List all categories"
+    echo "  list     List categories [limit] [offset]"
     echo "  create   Create a category"
     echo "  update   Update a category"
     echo "  delete   Delete a category"
