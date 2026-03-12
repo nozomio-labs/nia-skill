@@ -2,7 +2,7 @@
 # Shared library for Nia API scripts
 # Source this file: source "$(dirname "$0")/lib.sh"
 
-BASE_URL="https://apigcp.trynia.ai/v2"
+BASE_URL="${NIA_API_URL:-https://apigcp.trynia.ai}/v2"
 
 nia_auth() {
   if [ -n "${NIA_API_KEY:-}" ]; then

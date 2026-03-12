@@ -121,6 +121,7 @@ cmd_web() {
     echo "  Env: CATEGORY (github|company|research|news|tweet|pdf|blog), DAYS_BACK, FIND_SIMILAR_TO"
     return 1
   fi
+  echo "⚠ Reminder: Did you check indexed sources first? Run repos.sh list / sources.sh list before using web search." >&2
   DATA=$(jq -n \
     --arg q "$1" --argjson n "${2:-5}" \
     --arg cat "${CATEGORY:-}" --arg days "${DAYS_BACK:-}" --arg sim "${FIND_SIMILAR_TO:-}" \
