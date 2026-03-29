@@ -13,7 +13,8 @@ cmd_query() {
     echo "       STREAM, INCLUDE_SOURCES, FAST_MODE, SKIP_LLM,"
     echo "       REASONING_STRATEGY, MODEL, SEARCH_MODE,"
     echo "       BYPASS_CACHE, SEMANTIC_CACHE_THRESHOLD, INCLUDE_FOLLOW_UPS,"
-    echo "       TRUST_MINIMUM_TIER, TRUST_VERIFIED_ONLY, TRUST_REQUIRE_OVERLAY"
+    echo "       TRUST_MINIMUM_TIER, TRUST_VERIFIED_ONLY, TRUST_REQUIRE_OVERLAY,"
+    echo "       E2E_SESSION_ID"
     echo "  Slack filter env: SLACK_CHANNELS, SLACK_USERS, SLACK_DATE_FROM,"
     echo "       SLACK_DATE_TO, SLACK_INCLUDE_THREADS"
     echo "  Local source filter env: SOURCE_SUBTYPE, DB_TYPE, CONNECTOR_TYPE,"
@@ -92,7 +93,7 @@ cmd_query() {
     --arg fast "${FAST_MODE:-}" --arg skip "${SKIP_LLM:-}" \
     --arg rs "${REASONING_STRATEGY:-}" --arg model "${MODEL:-}" \
     --arg bc "${BYPASS_CACHE:-}" --arg sct "${SEMANTIC_CACHE_THRESHOLD:-}" \
-    --arg ifu "${INCLUDE_FOLLOW_UPS:-}" \
+    --arg ifu "${INCLUDE_FOLLOW_UPS:-}" --arg e2e "${E2E_SESSION_ID:-}" \
     '{mode: "query", messages: [{role: "user", content: $q}], repositories: $repos,
      data_sources: $docs, search_mode: $mode, stream: false, include_sources: true}
     + (if ($folders | length) > 0 then {local_folders: $folders} else {} end)
@@ -110,7 +111,8 @@ cmd_query() {
     + (if $model != "" then {model: $model} else {} end)
     + (if $bc != "" then {bypass_semantic_cache: ($bc == "true")} else {} end)
     + (if $sct != "" then {semantic_cache_threshold: ($sct | tonumber)} else {} end)
-    + (if $ifu != "" then {include_follow_ups: ($ifu == "true")} else {} end)')
+    + (if $ifu != "" then {include_follow_ups: ($ifu == "true")} else {} end)
+    + (if $e2e != "" then {e2e_session_id: $e2e} else {} end)')
   nia_post "$BASE_URL/search" "$DATA"
 }
 
@@ -153,8 +155,8 @@ cmd_universal() {
     echo "Usage: search.sh universal <query> [top_k]"
     echo "  Env: INCLUDE_REPOS, INCLUDE_DOCS, INCLUDE_HF, ALPHA, COMPRESS,"
     echo "       MAX_TOKENS, MAX_SOURCES, SOURCES_FOR_ANSWER, BYPASS_CACHE,"
-    echo "       SEMANTIC_CACHE_THRESHOLD, BOOST_LANGUAGES, LANGUAGE_BOOST,"
-    echo "       EXPAND_SYMBOLS, NATIVE_BOOSTING"
+    echo "       BYPASS_SEMANTIC_CACHE, SEMANTIC_CACHE_THRESHOLD, BOOST_LANGUAGES,"
+    echo "       LANGUAGE_BOOST, EXPAND_SYMBOLS, NATIVE_BOOSTING"
     return 1
   fi
   DATA=$(jq -n \
@@ -165,6 +167,7 @@ cmd_universal() {
     --arg ms "${MAX_SOURCES:-}" --arg sfa "${SOURCES_FOR_ANSWER:-}" \
     --arg bc "${BYPASS_CACHE:-}" --arg sct "${SEMANTIC_CACHE_THRESHOLD:-}" \
     --arg bl "${BOOST_LANGUAGES:-}" --arg lbf "${LANGUAGE_BOOST:-}" \
+    --arg bsc "${BYPASS_SEMANTIC_CACHE:-}" \
     --arg es "${EXPAND_SYMBOLS:-}" --arg nb "${NATIVE_BOOSTING:-${USE_NATIVE_BOOSTING:-}}" \
     '{mode: "universal", query: $q, top_k: $k,
      include_repos: ($ir == "true"), include_docs: ($id == "true"),
@@ -178,6 +181,7 @@ cmd_universal() {
     + (if $sct != "" then {semantic_cache_threshold: ($sct | tonumber)} else {} end)
     + (if $bl != "" then {boost_languages: ($bl | split(","))} else {} end)
     + (if $lbf != "" then {language_boost_factor: ($lbf | tonumber)} else {} end)
+    + (if $bsc != "" then {bypass_semantic_cache: ($bsc == "true")} else {} end)
     + (if $es != "" then {expand_symbols: ($es == "true")} else {} end)
     + (if $nb != "" then {use_native_boosting: ($nb == "true")} else {} end)')
   nia_post "$BASE_URL/search" "$DATA"

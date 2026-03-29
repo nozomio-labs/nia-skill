@@ -412,7 +412,7 @@ case "${1:-}" in
     echo ""
     echo "Commands:"
     echo "  index            Index a documentation site"
-    echo "  list [type]      List sources (repository|documentation|research_paper|huggingface_dataset|local_folder|slack|google_drive)"
+    echo "  list [type]      List sources (repository|documentation|research_paper|huggingface_dataset|local_folder|slack|google_drive|connector)"
     echo "  get              Get source details"
     echo "  resolve          Resolve source by name/URL"
     echo "  update           Update source display name / category"

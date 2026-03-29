@@ -1,7 +1,7 @@
 ---
 slug: nia
 name: Nia
-description: Index and search code repositories, documentation, research papers, HuggingFace datasets, local folders, Slack workspaces, Google Drive, and packages with Nia AI. Includes auth bootstrapping, Oracle autonomous research, GitHub live search, dependency analysis, context sharing, and code advisor.
+description: Index and search code repositories, documentation, research papers, HuggingFace datasets, local folders, Slack workspaces, Google Drive, X (Twitter), and packages with Nia AI. Includes auth bootstrapping, Oracle autonomous research, GitHub live search, Tracer agent, dependency analysis, context sharing, code advisor, document agent, data extraction, filesystem operations, and generic connectors.
 homepage: https://trynia.ai
 ---
 
@@ -9,7 +9,7 @@ homepage: https://trynia.ai
 
 **NEVER use web fetch or web search without checking Nia sources first. NEVER skip this workflow.**
 
-1. **Check what's indexed**: `./scripts/nia.sh sources` (quick summary of everything). For full details: `repos.sh list`, `sources.sh list`, `slack.sh list`, `google-drive.sh list`
+1. **Check what's indexed**: `./scripts/nia.sh sources` (quick summary of everything). For full details: `repos.sh list`, `sources.sh list`, `slack.sh list`, `google-drive.sh list`, `x.sh list`
 2. **Source exists? Search it**: `search.sh query`, `repos.sh grep/read`, `sources.sh grep/read/tree`
 3. **Slack connected?** `SLACK_WORKSPACES=<id> ./scripts/search.sh query "question"` or `slack.sh grep/messages`
 4. **Drive connected but not indexed?** `google-drive.sh browse` → `update-selection` → `index`, then use `sources.sh`
@@ -121,7 +121,7 @@ Env: `SAVE_KEY=true` to write `~/.config/nia/api_key`, `IDEMPOTENCY_KEY`
 **Index environment variables**: `DISPLAY_NAME`, `FOCUS`, `EXTRACT_BRANDING`, `EXTRACT_IMAGES`, `IS_PDF`, `IS_SPREADSHEET`, `URL_PATTERNS`, `EXCLUDE_PATTERNS`, `MAX_DEPTH`, `WAIT_FOR`, `CHECK_LLMS_TXT`, `LLMS_TXT_STRATEGY`, `INCLUDE_SCREENSHOT`, `ONLY_MAIN_CONTENT`, `ADD_GLOBAL`, `MAX_AGE`
 
 **List environment variables**: `STATUS`, `QUERY`, `CATEGORY_ID`
-**Generic source env**: `TYPE=<repository|documentation|research_paper|huggingface_dataset|local_folder|slack|google_drive>`, `BRANCH`, `URL`, `PAGE`, `TREE_NODE_ID`, `LINE_START`, `LINE_END`, `MAX_LENGTH`, `MAX_DEPTH`, `SYNC_JSON`
+**Generic source env**: `TYPE=<repository|documentation|research_paper|huggingface_dataset|local_folder|slack|google_drive|connector>`, `BRANCH`, `URL`, `PAGE`, `TREE_NODE_ID`, `LINE_START`, `LINE_END`, `MAX_LENGTH`, `MAX_DEPTH`, `SYNC_JSON`
 **Classification update env**: `ACTION=update`, `CATEGORIES=cat1,cat2`, `INCLUDE_UNCATEGORIZED=true|false`
 **Curation update env**: `TRUST_LEVEL` (low|medium|high), `OVERLAY_KIND` (custom|nia_verified), `OVERLAY_SUMMARY`, `OVERLAY_GUIDANCE`, `RECOMMENDED_QUERIES` (csv), `CLEAR_OVERLAY=true|false`
 **Grep environment variables**: `CASE_SENSITIVE`, `WHOLE_WORD`, `FIXED_STRING`, `OUTPUT_MODE`, `HIGHLIGHT`, `EXHAUSTIVE`, `LINES_AFTER`, `LINES_BEFORE`, `MAX_PER_FILE`, `MAX_TOTAL`
@@ -155,8 +155,8 @@ Env: `SAVE_KEY=true` to write `~/.config/nia/api_key`, `IDEMPOTENCY_KEY`
 ./scripts/search.sh deep <query> [output_format]                 # Deep research (Pro)
 ```
 
-**query** — targeted search with AI response and sources. Env: `LOCAL_FOLDERS`, `SLACK_WORKSPACES`, `CATEGORY`, `MAX_TOKENS`, `STREAM`, `INCLUDE_SOURCES`, `FAST_MODE`, `SKIP_LLM`, `REASONING_STRATEGY` (vector|tree|hybrid), `MODEL`, `SEARCH_MODE`, `BYPASS_CACHE`, `SEMANTIC_CACHE_THRESHOLD`, `INCLUDE_FOLLOW_UPS`, `TRUST_MINIMUM_TIER`, `TRUST_VERIFIED_ONLY`, `TRUST_REQUIRE_OVERLAY`. Slack filters: `SLACK_CHANNELS`, `SLACK_USERS`, `SLACK_DATE_FROM`, `SLACK_DATE_TO`, `SLACK_INCLUDE_THREADS`. Local source filters: `SOURCE_SUBTYPE`, `DB_TYPE`, `CONNECTOR_TYPE`, `CONVERSATION_ID`, `CONTACT_ID`, `SENDER_ROLE`, `TIME_AFTER`, `TIME_BEFORE`. **This is the only search command that supports Slack.**
-**universal** — hybrid vector + BM25 across all indexed public sources (repos + docs + HF datasets). **Does NOT include Slack.** Env: `INCLUDE_REPOS`, `INCLUDE_DOCS`, `INCLUDE_HF`, `ALPHA`, `COMPRESS`, `MAX_TOKENS`, `MAX_SOURCES`, `SOURCES_FOR_ANSWER`, `BYPASS_CACHE`, `SEMANTIC_CACHE_THRESHOLD`, `BOOST_LANGUAGES`, `EXPAND_SYMBOLS`
+**query** — targeted search with AI response and sources. Env: `LOCAL_FOLDERS`, `SLACK_WORKSPACES`, `CATEGORY`, `MAX_TOKENS`, `STREAM`, `INCLUDE_SOURCES`, `FAST_MODE`, `SKIP_LLM`, `REASONING_STRATEGY` (vector|tree|hybrid), `MODEL`, `SEARCH_MODE`, `BYPASS_CACHE`, `SEMANTIC_CACHE_THRESHOLD`, `INCLUDE_FOLLOW_UPS`, `TRUST_MINIMUM_TIER`, `TRUST_VERIFIED_ONLY`, `TRUST_REQUIRE_OVERLAY`, `E2E_SESSION_ID`. Slack filters: `SLACK_CHANNELS`, `SLACK_USERS`, `SLACK_DATE_FROM`, `SLACK_DATE_TO`, `SLACK_INCLUDE_THREADS`. Local source filters: `SOURCE_SUBTYPE`, `DB_TYPE`, `CONNECTOR_TYPE`, `CONVERSATION_ID`, `CONTACT_ID`, `SENDER_ROLE`, `TIME_AFTER`, `TIME_BEFORE`. **This is the only search command that supports Slack.**
+**universal** — hybrid vector + BM25 across all indexed public sources (repos + docs + HF datasets). **Does NOT include Slack.** Env: `INCLUDE_REPOS`, `INCLUDE_DOCS`, `INCLUDE_HF`, `ALPHA`, `COMPRESS`, `MAX_TOKENS`, `MAX_SOURCES`, `SOURCES_FOR_ANSWER`, `BYPASS_CACHE`, `BYPASS_SEMANTIC_CACHE`, `SEMANTIC_CACHE_THRESHOLD`, `BOOST_LANGUAGES`, `LANGUAGE_BOOST`, `EXPAND_SYMBOLS`, `NATIVE_BOOSTING`
 **web** — web search. Env: `CATEGORY` (github|company|research|news|tweet|pdf|blog), `DAYS_BACK`, `FIND_SIMILAR_TO`
 **deep** — deep AI research (Pro). Env: `VERBOSE`
 
@@ -260,6 +260,31 @@ Autonomous agent for searching GitHub repositories without indexing. Delegates t
 **index** env: `FILE_IDS`, `FOLDER_IDS`, `DISPLAY_NAME`
 **sync** env: `FORCE_FULL=true`, `SCOPE_IDS`
 
+### x.sh — X (Twitter) Integration
+
+```bash
+./scripts/x.sh create <username> <bearer_token> [display_name]  # Create X installation
+./scripts/x.sh list                                              # List X installations
+./scripts/x.sh get <installation_id>                             # Get installation details
+./scripts/x.sh delete <installation_id>                          # Remove installation
+./scripts/x.sh index <installation_id>                           # Trigger re-index
+./scripts/x.sh status <installation_id>                          # Get indexing status
+```
+
+**create** env: `MAX_RESULTS` (1-500), `INCLUDE_REPLIES`, `INCLUDE_RETWEETS`, `DISPLAY_NAME`
+
+### connectors.sh — Generic Connectors
+
+```bash
+./scripts/connectors.sh list                                     # List available connector types
+./scripts/connectors.sh installations                            # List connector installations
+./scripts/connectors.sh install <connector_type>                 # Install a connector
+./scripts/connectors.sh delete <installation_id>                 # Disconnect installation
+./scripts/connectors.sh index <installation_id>                  # Trigger indexing
+./scripts/connectors.sh schedule <installation_id>               # Update sync schedule
+./scripts/connectors.sh status <installation_id>                 # Get sync status
+```
+
 ### github.sh — Live GitHub Search (No Indexing Required)
 
 ```bash
@@ -300,6 +325,52 @@ Supports: `squad`, `dair-ai/emotion`, `https://huggingface.co/datasets/squad`. E
 Registry: `npm` | `py_pi` | `crates_io` | `golang_proxy` | `ruby_gems`
 Grep env: `LANGUAGE`, `CONTEXT_BEFORE`, `CONTEXT_AFTER`, `OUTPUT_MODE`, `HEAD_LIMIT`, `FILE_SHA256`
 Hybrid env: `PATTERN` (regex pre-filter), `LANGUAGE`, `FILE_SHA256`
+
+### document.sh — Document AI Agent
+
+```bash
+./scripts/document.sh <source_id> <query>                        # Query document with AI agent
+```
+
+Runs an AI agent against an indexed PDF or document. The agent uses tools (search, read sections, read pages) to research and produce a comprehensive answer with citations. Supports structured output via JSON schema.
+
+**Environment variables**: `MODEL` (claude-opus-4-6-1m|claude-opus-4-6|claude-sonnet-4-5-20250929), `THINKING` (true/false), `THINKING_BUDGET` (1000-50000), `STREAM`, `JSON_SCHEMA`, `JSON_SCHEMA_FILE`
+
+### extract.sh — Structured Data Extraction
+
+```bash
+./scripts/extract.sh start <json_schema_file_or_string>          # Start table extraction
+./scripts/extract.sh get <extraction_id>                         # Get extraction results
+./scripts/extract.sh engineering                                  # Start engineering extraction
+./scripts/extract.sh engineering-get <extraction_id>              # Get engineering results
+./scripts/extract.sh engineering-query <extraction_id> <query>    # Query engineering extraction
+./scripts/extract.sh list [limit] [offset]                       # List all extractions
+```
+
+**start** env: `URL`, `SOURCE_ID`, `PAGE_RANGE`
+**engineering** env: `URL`, `SOURCE_ID`, `PAGE_RANGE`, `ACCURACY_MODE` (fast|accurate)
+**list** env: `EXTRACT_TYPE` (table|engineering)
+
+### fs.sh — Filesystem Operations on Sources
+
+```bash
+./scripts/fs.sh info <source_id>                                 # Get filesystem info
+./scripts/fs.sh tree <source_id> [path]                          # Get file tree
+./scripts/fs.sh ls <source_id> [path]                            # List directory contents
+./scripts/fs.sh read <source_id> <path> [line_start] [line_end]  # Read a file
+./scripts/fs.sh find <source_id> <glob_pattern>                  # Find files by pattern
+./scripts/fs.sh grep <source_id> <pattern> [path]                # Regex search
+./scripts/fs.sh write <source_id> <path> [local_file]            # Write file (file or stdin)
+./scripts/fs.sh write-batch <source_id> <files_json>             # Write multiple files
+./scripts/fs.sh delete <source_id> <path>                        # Delete a file
+./scripts/fs.sh mkdir <source_id> <path>                         # Create directory
+./scripts/fs.sh mv <source_id> <old_path> <new_path>             # Move/rename file
+```
+
+Lower-level filesystem operations on indexed sources. Use when you need direct file manipulation (write, delete, move) rather than just read/search.
+
+**write** env: `LANGUAGE`, `ENCODING`
+**grep** env: `CASE_SENSITIVE`, `WHOLE_WORD`, `FIXED_STRING`, `OUTPUT_MODE`, `HIGHLIGHT`, `LINES_AFTER`, `LINES_BEFORE`, `MAX_PER_FILE`, `MAX_TOTAL`
 
 ### categories.sh — Organize Sources
 
@@ -388,6 +459,8 @@ Analyzes your code against indexed docs. Env: `REPOS` (csv), `DOCS` (csv), `OUTP
 | Local Folder | `folders.sh create` | UUID, display name (private, user-scoped) |
 | Google Drive | `google-drive.sh install` + `index` | installation ID, source ID |
 | Slack | `slack.sh register-token` / OAuth | installation ID |
+| X (Twitter) | `x.sh create` | installation ID |
+| Connector | `connectors.sh install` | installation ID |
 
 ### Search Modes
 

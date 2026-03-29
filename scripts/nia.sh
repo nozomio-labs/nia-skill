@@ -11,7 +11,7 @@ cmd_sources() {
   local raw
   raw=$(nia_get "$BASE_URL/sources-summary")
 
-  local repos docs papers datasets folders slack drive
+  local repos docs papers datasets folders slack drive xcount
   repos=$(echo "$raw" | jq -r '.repositories.count // 0')
   docs=$(echo "$raw" | jq -r '.documentation.count // 0')
   papers=$(echo "$raw" | jq -r '.research_papers.count // 0')
@@ -19,6 +19,7 @@ cmd_sources() {
   folders=$(echo "$raw" | jq -r '.local_folders.count // 0')
   slack=$(echo "$raw" | jq -r '.slack.count // 0')
   drive=$(echo "$raw" | jq -r '.google_drive.count // 0')
+  xcount=$(echo "$raw" | jq -r '.x.count // 0')
 
   echo "=== Nia Sources Summary ==="
   echo ""
@@ -30,9 +31,10 @@ cmd_sources() {
   _print_type "Local Folders" "$folders" "$(echo "$raw" | jq -r '(.local_folders.names // [])[:5] | join(", ")')"
   _print_type "Slack" "$slack" "$(echo "$raw" | jq -r '(.slack.names // [])[:5] | join(", ")')"
   _print_type "Google Drive" "$drive" "$(echo "$raw" | jq -r '(.google_drive.names // [])[:5] | join(", ")')"
+  _print_type "X (Twitter)" "$xcount" "$(echo "$raw" | jq -r '(.x.names // [])[:5] | join(", ")')"
 
   echo ""
-  echo "For full details, use: repos.sh list, sources.sh list, slack.sh list, google-drive.sh list, folders.sh list"
+  echo "For full details, use: repos.sh list, sources.sh list, slack.sh list, google-drive.sh list, x.sh list, folders.sh list"
 }
 
 _print_type() {
